@@ -1,0 +1,7 @@
+# GitAgent-specific adapter: preload ONLY the OKF navigation map.
+# This is not the OKF spec's index (that is index.md).
+entries:
+  - path: index.md
+    priority: high
+    tags: [okf, navigation]
+    always_load: true

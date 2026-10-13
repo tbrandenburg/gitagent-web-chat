@@ -1,0 +1,219 @@
+#!/usr/bin/env python3
+"""Small OKF v0.2 bundle navigator for GitAgent (no database or web service).
+
+This is a minimal reader/search/index tool, not an official reference implementation.
+"""
+import argparse
+from datetime import datetime, timezone
+from pathlib import Path
+import re
+import sys
+
+import yaml
+
+DEFAULT_ROOT = Path('/agent/knowledge')
+RESERVED = {'index.md', 'log.md'}
+
+
+def safe_path(root: Path, name: str) -> Path:
+    root = root.resolve()
+    target = (root / name.lstrip('/') if name.startswith('/') else root / name).resolve()
+    if not target.is_relative_to(root):
+        raise ValueError(f'path leaves knowledge bundle: {name}')
+    return target
+
+
+def parse_frontmatter(content: str):
+    lines = content.splitlines(keepends=True)
+    if not lines or lines[0].strip() != '---':
+        raise ValueError('missing YAML frontmatter')
+    end = next((i for i in range(1, len(lines)) if lines[i].strip() == '---'), None)
+    if end is None:
+        raise ValueError('unclosed YAML frontmatter')
+    metadata = yaml.safe_load(''.join(lines[1:end])) or {}
+    if not isinstance(metadata, dict):
+        raise ValueError('frontmatter is not a mapping')
+    return metadata, ''.join(lines[end+1:])
+
+
+def document(path: Path):
+    return parse_frontmatter(path.read_text(encoding='utf-8'))
+
+
+def concepts(root: Path):
+    for file in sorted(root.rglob('*.md')):
+        if file.name not in RESERVED and file.is_file() and not file.is_symlink():
+            yield file
+
+
+def trust(meta):
+    verified = meta.get('verified') or []
+    if isinstance(verified, dict):
+        verified = [verified]
+    if not isinstance(verified, list) or not verified:
+        return 'unverified'
+    if any(str(x.get('by','')).startswith('human:') for x in verified if isinstance(x, dict)):
+        return 'human-reviewed'
+    return 'machine-confirmed'
+
+
+def life(meta):
+    state = str(meta.get('status') or 'stable')
+    stale = meta.get('stale_after')
+    if stale:
+        try:
+            dt = datetime.fromisoformat(str(stale).replace('Z', '+00:00'))
+            if dt.tzinfo is not None and datetime.now(timezone.utc) >= dt:
+                state += ',stale'
+        except (ValueError, TypeError):
+            state += ',invalid-stale-after'
+    return state
+
+
+def index_content(root: Path, folder: Path):
+    """Synthesize exactly one directory level; never dump all descendants."""
+    relative = folder.relative_to(root)
+    result = []
+    for child in sorted(folder.iterdir()):
+        if child.name.startswith('.') or child.is_symlink():
+            continue
+        if child.is_dir():
+            if any(child.rglob('*.md')):
+                result.append(f'- [{child.name}/]({child.name}/) — knowledge topic')
+        elif child.suffix == '.md' and child.name not in RESERVED:
+            try:
+                meta, _ = document(child)
+            except (ValueError, yaml.YAMLError):
+                continue
+            label = meta.get('title') or child.stem.replace('-', ' ').title()
+            description = meta.get('description') or meta.get('type') or 'concept'
+            result.append(f'- [{label}]({child.name}) — {description}')
+    header = f'# {relative.as_posix() if str(relative) != "." else "Knowledge base"}'
+    if str(relative) == '.':
+        header = '---\nokf_version: "0.2"\n---\n\n' + header
+    return header + '\n\n' + ('\n'.join(result) if result else '_No entries yet._') + '\n'
+
+
+def cmd_index(args, root):
+    folder = safe_path(root, args.directory)
+    if not folder.is_dir():
+        raise ValueError(f'no such knowledge directory: {args.directory}')
+    idx = folder / 'index.md'
+    sys.stdout.write(idx.read_text(encoding='utf-8') if idx.is_file() else index_content(root, folder))
+
+
+def cmd_read(args, root):
+    path = safe_path(root, args.path)
+    if not path.is_file() or path.suffix != '.md':
+        raise ValueError(f'not a knowledge markdown file: {args.path}')
+    sys.stdout.write(path.read_text(encoding='utf-8'))
+
+
+def cmd_search(args, root):
+    terms = [t.lower() for t in re.findall(r'[\w-]+', ' '.join(args.query))]
+    if not terms:
+        raise ValueError('search requires a non-empty query')
+    results = []
+    for path in concepts(root):
+        try:
+            meta, body = document(path)
+        except (OSError, ValueError, yaml.YAMLError):
+            continue
+        status = str(meta.get('status') or 'stable')
+        if status == 'deprecated' and not args.include_deprecated:
+            continue
+        title = str(meta.get('title') or path.stem)
+        description = str(meta.get('description') or '')
+        tags = meta.get('tags') or []
+        if isinstance(tags, str):
+            tags = [tags]
+        tags_str = ' '.join(map(str, tags))
+        pathstr = path.relative_to(root).as_posix()
+        fields = [(title, 8), (description, 5), (tags_str, 6), (pathstr, 3), (body, 1)]
+        score = sum(weight * text.lower().count(term) for term in terms for text, weight in fields)
+        if not score:
+            continue
+        results.append((score, pathstr, title, description, meta))
+    results.sort(key=lambda r: (-r[0], r[1]))
+    for score, path, title, desc, meta in results[:args.limit]:
+        print(f'{path} | {title} | {meta.get("type", "?")} | {life(meta)} | {trust(meta)}')
+        if desc:
+            print(f'  {desc[:240]}')
+    if not results:
+        print('No matching concepts.')
+
+
+def cmd_validate(args, root):
+    errors = []
+    files = list(concepts(root))
+    for path in files:
+        rel = path.relative_to(root)
+        try:
+            meta, _ = document(path)
+            if not isinstance(meta.get('type'), str) or not meta['type'].strip():
+                errors.append(f'{rel}: missing or empty string type')
+            if 'status' in meta and meta['status'] not in ('draft', 'stable', 'deprecated'):
+                errors.append(f'{rel}: invalid status')
+        except (ValueError, yaml.YAMLError, UnicodeError) as err:
+            errors.append(f'{rel}: {err}')
+    for idx in root.rglob('index.md'):
+        if idx.is_symlink():
+            continue
+        try:
+            value = idx.read_text(encoding='utf-8')
+            if value.startswith('---\n'):
+                if idx != root / 'index.md':
+                    errors.append(f'{idx.relative_to(root)}: only root index may have frontmatter')
+                else:
+                    front, _ = parse_frontmatter(value)
+                    if set(front) - {'okf_version'}:
+                        errors.append('index.md: only okf_version is permitted in root index frontmatter')
+        except (UnicodeError, ValueError, yaml.YAMLError) as err:
+            errors.append(f'{idx.relative_to(root)}: {err}')
+    for error in errors:
+        print('ERROR:', error)
+    print(f'Checked {len(files)} concepts: {len(errors)} error(s).')
+    return 1 if errors else 0
+
+
+def cmd_reindex(args, root):
+    directories = [root] + [p for p in root.rglob('*') if p.is_dir() and not p.is_symlink()]
+    for folder in sorted(directories, key=lambda p: len(p.parts), reverse=True):
+        idx = folder / 'index.md'
+        if idx.exists() and not args.force:
+            print(f'Skipped {idx.relative_to(root)} (use --force to overwrite)')
+            continue
+        idx.write_text(index_content(root, folder), encoding='utf-8')
+        print(f'Wrote {idx.relative_to(root)}')
+
+
+def main():
+    parser = argparse.ArgumentParser(description='Navigate an Open Knowledge Format v0.2 bundle')
+    parser.add_argument('--root', type=Path, default=DEFAULT_ROOT, help='OKF bundle directory (default: /agent/knowledge)')
+    sub = parser.add_subparsers(dest='command', required=True)
+    p = sub.add_parser('index', help='Show only the root or a topic index')
+    p.add_argument('directory', nargs='?', default='.')
+    p = sub.add_parser('read', help='Read one knowledge file')
+    p.add_argument('path')
+    p = sub.add_parser('search', help='Find relevant concepts; return metadata only')
+    p.add_argument('query', nargs='+')
+    p.add_argument('--limit', type=int, default=8)
+    p.add_argument('--include-deprecated', action='store_true')
+    sub.add_parser('validate', help='Basic OKF v0.2 structure check (not full spec lint)')
+    p = sub.add_parser('reindex', help='Generate one-level navigation indexes')
+    p.add_argument('--force', action='store_true', help='Replace existing curated indexes')
+    args = parser.parse_args()
+    root = args.root.resolve()
+    if not root.is_dir():
+        parser.error(f'knowledge root does not exist: {root}')
+    try:
+        result = {'index': cmd_index, 'read': cmd_read, 'search': cmd_search,
+                  'validate': cmd_validate, 'reindex': cmd_reindex}[args.command](args, root)
+        return result if isinstance(result, int) else 0
+    except (OSError, ValueError) as err:
+        print(f'OKF error: {err}', file=sys.stderr)
+        return 2
+
+
+if __name__ == '__main__':
+    sys.exit(main())

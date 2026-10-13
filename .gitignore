@@ -1,0 +1,9 @@
+.env
+.env.*
+!.env.example
+.gitagent/
+workspace/
+memory/
+.playwright-mcp/
+node_modules/
+__pycache__/
