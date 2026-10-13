@@ -1,11 +1,6 @@
 ---
 name: okf-knowledge
 description: Consult, search, add, maintain, and validate project knowledge in the OKF bundle using progressive disclosure; use for project facts, previous decisions, and knowledge-base updates.
-confidence: 1
-usage_count: 1
-success_count: 1
-failure_count: 0
-negative_examples: []
 ---
 # Consult the OKF knowledge base
 

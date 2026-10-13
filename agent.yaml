@@ -1,7 +1,7 @@
 spec_version: "0.1.0"
-name: portable-web-agent
+name: my-agent
 version: 0.1.0
-description: Portable GitAgent with OKF knowledge
+description: A helpful assistant that consults its OKF knowledge base.
 model:
   preferred: "openai:gpt-6-luna"
   fallback: []

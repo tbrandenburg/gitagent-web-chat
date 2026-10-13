@@ -4,16 +4,32 @@ import { createRequire } from 'node:module';
 const require = createRequire('/usr/local/lib/node_modules/@open-gitagent/voice/package.json');
 const WebSocket = require('ws');
 const base = 'http://127.0.0.1:3333';
+const password = process.env.GITAGENT_PASSWORD ?? '';
+const headers = {};
 const health = await fetch(`${base}/health`, { signal: AbortSignal.timeout(10000) });
 assert.equal(health.status, 200);
-assert.deepEqual(await health.json(), { status: 'ok' });
-const page = await fetch(base, { redirect: 'manual', signal: AbortSignal.timeout(10000) });
+assert.deepEqual(await health.json(), password ? { status: 'ok', auth: 'required' } : { status: 'ok' });
+if (password) {
+  const username = process.env.GITAGENT_USERNAME ?? 'admin';
+  const login = (value) => fetch(`${base}/api/auth`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, password: value }), signal: AbortSignal.timeout(10000),
+  });
+  assert.equal((await login(`${password}-incorrect`)).status, 401);
+  const authenticated = await login(password);
+  assert.equal(authenticated.status, 200);
+  assert.equal((await authenticated.json()).ok, true);
+  const cookie = authenticated.headers.get('set-cookie');
+  assert.ok(cookie);
+  headers.Cookie = cookie.split(';')[0];
+}
+const page = await fetch(base, { headers, redirect: 'manual', signal: AbortSignal.timeout(10000) });
 assert.equal(page.status, 200);
 assert.doesNotMatch(await page.text(), /Sign in to continue|onsubmit="return doLogin\(\)"/);
-console.log('HTTP health and UI: 200 without credentials');
+console.log(password ? 'HTTP health and UI: 200 after login; incorrect password rejected' : 'HTTP health and UI: 200 without credentials');
 
 await new Promise((resolve, reject) => {
-  const socket = new WebSocket('ws://127.0.0.1:3333');
+  const socket = new WebSocket('ws://127.0.0.1:3333', { headers });
   const timer = setTimeout(() => finish(new Error('No model response within 90 seconds')), 90000);
   const finish = (error) => {
     clearTimeout(timer);
@@ -27,7 +43,7 @@ await new Promise((resolve, reject) => {
   socket.on('error', finish);
   socket.on('message', (data) => {
     const message = JSON.parse(data.toString());
-    if (message.type === 'transcript' && message.text.includes('Voice mode unavailable')) {
+    if (message.type === 'transcript' && (message.text === 'Text chat ready.' || message.text.includes('Voice mode unavailable'))) {
       socket.send(JSON.stringify({
         type: 'text',
         text: 'Reply with exactly: LUNA_CHAT_OK. Do not use tools, write files, or update memory.',

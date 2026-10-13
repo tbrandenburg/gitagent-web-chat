@@ -39,3 +39,44 @@ class RuntimeTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'cannot be applied safely'):
             RUNTIME.configure(self.loader)
         self.assertEqual(self.loader.read_text(), original)
+
+    def test_auth_crypto_imports_are_native_and_idempotent(self):
+        self.loader.write_text('const { createHash } = require("crypto");\n'
+                               'const { timingSafeEqual } = require("crypto");\n')
+        RUNTIME.configure_auth(self.loader)
+        updated = self.loader.read_text()
+        self.assertIn('import { createHash, timingSafeEqual } from "node:crypto";', updated)
+        self.assertNotIn('require("crypto")', updated)
+        RUNTIME.configure_auth(self.loader)
+        self.assertEqual(self.loader.read_text(), updated)
+
+    def test_unexpected_auth_source_is_not_modified(self):
+        original = 'const { createHash } = require("crypto");\n'
+        self.loader.write_text(original)
+        with self.assertRaisesRegex(ValueError, 'Unexpected GitAgent auth server'):
+            RUNTIME.configure_auth(self.loader)
+        self.assertEqual(self.loader.read_text(), original)
+
+    def test_text_transport_forwards_the_reply_before_completion(self):
+        self.loader.write_text('return loadUIHtml()\n'
+                               'text: "Voice mode unavailable — no API key set. You can still chat via text.",\n'
+                               'safeSend(browserWs, JSON.stringify({ type: "agent_done", result }));\n'
+                               '                            appendMessage(opts.agentDir, activeBranch, { type: "transcript", role: "assistant", text: result });\n'
+                               'const url = new URL(req.url || "/", `http://localhost:${port}`);\n')
+        RUNTIME.configure_text_chat(self.loader)
+        updated = self.loader.read_text()
+        self.assertIn('Text chat ready.', updated)
+        self.assertNotIn('Voice mode unavailable', updated)
+        self.assertIn('res.writeHead(204)', updated)
+        self.assertIn('"@media (max-width: 900px)"', updated)
+        self.assertLess(updated.index('sendToBrowser({ type: "transcript"'),
+                        updated.index('safeSend(browserWs'))
+        RUNTIME.configure_text_chat(self.loader)
+        self.assertEqual(self.loader.read_text(), updated)
+
+    def test_unexpected_text_transport_is_not_modified(self):
+        original = 'text: "Text transport changed upstream",\n'
+        self.loader.write_text(original)
+        with self.assertRaisesRegex(ValueError, 'Unexpected GitAgent text transport'):
+            RUNTIME.configure_text_chat(self.loader)
+        self.assertEqual(self.loader.read_text(), original)
