@@ -43,6 +43,7 @@ case "$COMMAND" in
        -p "127.0.0.1:${PORT}:3333" \
        -v "$AGENT_DIR:/agent" -w /agent \
        -v "$LAUNCHER_DIR/bin/configure-runtime.py:/configure-runtime.py:ro" \
+       -v "$LAUNCHER_DIR/bin/okf:/usr/local/bin/okf:ro" \
        -v "$LAUNCHER_DIR/tests:/launcher-tests:ro" \
        "${ENV_MOUNT[@]}" \
        -e OPENAI_API_KEY -e GITAGENT_USERNAME="${GITAGENT_USERNAME:-admin}" \

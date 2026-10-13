@@ -104,6 +104,8 @@ and `skills/okf-knowledge/` into that folder.
 `PORT=` overrides the selected agent's `CHAT_PORT`; without an override its
 environment setting is respected. `make validate` and `make search` also accept
 `AGENT_DIR=`. A separate port is required for simultaneous agents.
+The launcher also mounts the `okf` utility, so an external agent folder does not
+need its own `bin/` directory for knowledge searches.
 
 ## Optional OpenCode V2 frontend
 
@@ -114,6 +116,9 @@ make logs-opencode
 # Browse http://localhost:4096 — password: password
 make down-opencode
 ```
+
+On the first OpenCode visit, choose **Add project**, select `/workspace`, and
+start a session. That directory is the exported copy of your selected agent.
 
 For another agent, use
 `make up-opencode AGENT_DIR=/absolute/path/to/other-agent OPENCODE_PORT=4097`.
@@ -130,6 +135,7 @@ container-local workspace, excluding `.env`, Git metadata, runtime memory,
 dependencies, and browser artifacts. Source files remain untouched; OpenCode
 sessions and workspace edits survive a container restart but are lost when the
 container is removed. Runtime packages are installed once per container.
+The mounted `okf` utility uses `OKF_ROOT=/workspace/knowledge` in this runtime.
 
 The upstream OpenGAP adapter exports the identity, rules, and skill instructions.
 A small compatibility helper writes native V2 configuration and explicitly

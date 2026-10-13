@@ -75,6 +75,14 @@ class OKFTests(unittest.TestCase):
         self.assertEqual(result.returncode, 2)
         self.assertIn('not a knowledge markdown file', result.stderr)
 
+    def test_runtime_root_can_be_selected_without_cli_flags(self):
+        result = subprocess.run([sys.executable, str(CLI), 'index'],
+                                env={'OKF_ROOT': str(self.root)},
+                                capture_output=True, text=True, timeout=10)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('[Operations](operations/)', result.stdout)
+        self.assertIn('[Design decisions](decisions/)', result.stdout)
+
 
 if __name__ == '__main__':
     unittest.main()

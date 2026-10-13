@@ -28,13 +28,14 @@ case "$COMMAND" in
        -p "127.0.0.1:${PORT}:4096" \
        -v "$AGENT_DIR:/source-agent:ro" \
        -v "$LAUNCHER_DIR/bin/export-opencode.mjs:/export-opencode.mjs:ro" \
-       -e OPENAI_API_KEY -e OPENCODE_SERVER_PASSWORD \
+       -v "$LAUNCHER_DIR/bin/okf:/usr/local/bin/okf:ro" \
+       -e OPENAI_API_KEY -e OPENCODE_SERVER_PASSWORD -e OKF_ROOT=/workspace/knowledge \
        "$IMAGE" bash -lc '
          set -euo pipefail
          mkdir -p /runtime /workspace
          if [[ ! -f /runtime/workspace-ready ]]; then
            apt-get update -qq
-           apt-get install -y -qq --no-install-recommends git ca-certificates >/dev/null
+           apt-get install -y -qq --no-install-recommends git ca-certificates python3 python3-yaml >/dev/null
            npm install -g @open-gitagent/opengap@0.5.0 @opencode/cli@2.0.28
            tar -C /source-agent --exclude=.git --exclude=".env*" --exclude=.gitagent \
              --exclude=.playwright-mcp --exclude=node_modules --exclude=__pycache__ \
