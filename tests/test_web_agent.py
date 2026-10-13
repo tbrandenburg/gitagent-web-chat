@@ -28,7 +28,8 @@ class LauncherTests(unittest.TestCase):
         self.assertIn('Set OPENAI_API_KEY', result.stderr)
 
     def test_auth_requires_password_when_enabled(self):
-        self.env.update(OPENAI_API_KEY='synthetic-key', GITAGENT_AUTH='true')
+        self.env.update(OPENAI_API_KEY='synthetic-key', GITAGENT_AUTH='true',
+                        GITAGENT_PASSWORD='')
         result = self.launch()
         self.assertNotEqual(result.returncode, 0)
         self.assertIn('Set GITAGENT_PASSWORD when GITAGENT_AUTH=true', result.stderr)
@@ -40,10 +41,10 @@ class LauncherTests(unittest.TestCase):
         self.assertIn('GITAGENT_AUTH must be true or false', result.stderr)
 
     def test_agent_env_is_loaded(self):
-        (self.agent / '.env').write_text('OPENAI_API_KEY=synthetic-key\nGITAGENT_AUTH=true\n')
+        (self.agent / '.env').write_text('OPENAI_API_KEY=synthetic-key\nGITAGENT_AUTH=invalid\n')
         result = self.launch()
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn('Set GITAGENT_PASSWORD', result.stderr)
+        self.assertIn('GITAGENT_AUTH must be true or false', result.stderr)
         self.assertNotIn('Set OPENAI_API_KEY', result.stderr)
 
     def test_missing_manifest_is_rejected(self):
@@ -62,7 +63,7 @@ class LauncherTests(unittest.TestCase):
         manifest = yaml.safe_load((BASE / 'agent.yaml').read_text())
         self.assertEqual(manifest['model']['preferred'], 'openai:gpt-6-luna')
         self.assertEqual(manifest['model']['fallback'], [])
-        self.assertIn('--model openai:gpt-6-luna', (BASE / 'web-agent.sh').read_text())
+        self.assertNotIn('--model', (BASE / 'web-agent.sh').read_text())
         self.assertIn('openai:gpt-6-luna', (BASE / 'README.md').read_text())
         self.assertIn('openai:gpt-6-luna',
                       (BASE / 'knowledge/operations/web-chat.md').read_text())
@@ -75,6 +76,19 @@ class LauncherTests(unittest.TestCase):
                 self.assertGreater((BASE / name).stat().st_size, 0)
         self.assertIn('knowledge/', (BASE / 'RULES.md').read_text())
         self.assertFalse((BASE / 'bootstrap').exists())
+
+    def test_invalid_port_is_rejected(self):
+        self.env.update(OPENAI_API_KEY='synthetic-key', CHAT_PORT_OVERRIDE='70000')
+        result = self.launch()
+        self.assertEqual(result.returncode, 2)
+        self.assertIn('CHAT_PORT must be an integer', result.stderr)
+
+    def test_make_port_override_takes_precedence_over_agent_env(self):
+        (self.agent / '.env').write_text('CHAT_PORT=3333\nOPENAI_API_KEY=synthetic-key\n')
+        self.env['CHAT_PORT_OVERRIDE'] = 'invalid'
+        result = self.launch()
+        self.assertEqual(result.returncode, 2)
+        self.assertIn('CHAT_PORT must be an integer', result.stderr)
 
 
 if __name__ == '__main__':

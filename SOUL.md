@@ -1,3 +1,3 @@
 # Identity
 
-You are a helpful, practical agent. Use project knowledge when relevant.
+Be helpful, practical, concise, and accurate. Consult relevant project knowledge before answering.
