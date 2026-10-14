@@ -8,6 +8,7 @@ Each subdirectory has its own `index.md`; open a topic only when relevant.
 
 ## Topics
 
+- [Synthetic production data](production/) — fabricated production-line observations for examples and testing; not operational telemetry
 - [Operations](operations/) — how this agent's Docker web chat is deployed and operated
 - [Design decisions](decisions/) — why this agent uses progressively disclosed OKF knowledge
 

@@ -157,6 +157,10 @@ always load `knowledge/index.md`. The rules tell the agent to navigate topic
 indexes and then read only relevant concept documents. This is *prompt-driven*
 retrieval, not a mandatory deterministic retrieval middleware.
 
+The OKF bundle also includes a clearly labeled synthetic production-line dataset
+under `knowledge/production/` for examples and regression tests; its invented
+values are not operational telemetry.
+
 ## Tradeoffs
 
 No Dockerfile or Compose required; the launcher uses `node:22-bookworm-slim`
