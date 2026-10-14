@@ -4,7 +4,7 @@ PORT ?=
 OPENCODE_PORT ?=
 export CHAT_PORT_OVERRIDE := $(PORT)
 export OPENCODE_PORT_OVERRIDE := $(OPENCODE_PORT)
-.PHONY: up down logs status shell validate search test lint test-live test-production-live test-mcp-live up-opencode down-opencode logs-opencode status-opencode shell-opencode
+.PHONY: up down logs status shell validate search test lint test-live test-production-live test-mcp-live test-gitagent-mcp-live up-opencode down-opencode logs-opencode status-opencode shell-opencode
 
 up:
 	./web-agent.sh start "$(AGENT_DIR)"
@@ -47,6 +47,9 @@ test-production-live:
 
 test-mcp-live:
 	./opencode-web.sh test-mcp "$(AGENT_DIR)"
+
+test-gitagent-mcp-live:
+	LIVE_CHAT_SCENARIO=mcp ./web-agent.sh test "$(AGENT_DIR)"
 
 up-opencode:
 	./opencode-web.sh start "$(AGENT_DIR)"

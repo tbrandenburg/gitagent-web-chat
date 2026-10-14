@@ -186,6 +186,16 @@ Run `make test-mcp-live` after startup to verify keyless configuration, successf
 the runtime's connected status. This consumes model API tokens, not a Context7
 API key, and checks tool execution rather than merely trusting the model's answer.
 
+Context7 also works in the GitAgent frontend started by `make up`.
+The pinned GitAgent 2.2.0 MCP loader defaults URL-only declarations to stdio;
+the guarded container-only helper infers HTTP when a URL is present without a
+transport type or local command. Explicit transports and local commands are
+unchanged. This keeps `agent.yaml` valid for OpenGAP without adding its unsupported
+`type: http` field. An existing GitAgent container needs a restart to apply an
+updated helper; `make up` does not restart a running container.
+Run `make test-gitagent-mcp-live` to verify both real Context7 tool results over
+the authenticated chat WebSocket. It uses model API tokens but no Context7 key.
+
 Sources: [OpenGAP 0.5.0 manifest schema](https://github.com/open-gitagent/opengap/blob/v0.5.0/spec/schemas/agent-yaml.schema.json),
 [OpenGAP OpenCode exporter](https://github.com/open-gitagent/opengap/blob/v0.5.0/src/adapters/opencode.ts),
 [OpenCode V2 MCP configuration](https://opencode.ai/v2/docs/mcp-servers), and

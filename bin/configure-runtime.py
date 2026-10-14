@@ -35,6 +35,17 @@ def configure_auth(path: Path) -> None:
     path.write_text(marker + '\n' + updated)
 
 
+def configure_mcp(path: Path) -> None:
+    original = 'if (cfg.type === "http") {'
+    replacement = 'if (cfg.type === "http" || (!cfg.type && cfg.url && !cfg.command)) {'
+    source = path.read_text()
+    if source.count(replacement) == 1 and original not in source:
+        return
+    if source.count(original) != 1 or replacement in source:
+        raise ValueError('Unexpected GitAgent MCP manager; transport adapter cannot be applied safely')
+    path.write_text(source.replace(original, replacement))
+
+
 def configure_text_chat(path: Path) -> None:
     replacements = (
         ('return loadUIHtml()',
@@ -65,6 +76,7 @@ def configure_text_chat(path: Path) -> None:
 
 if __name__ == '__main__':
     configure(Path(sys.argv[1]))
+    configure_mcp(Path(sys.argv[1]).parent / 'mcp/manager.js')
     if len(sys.argv) > 2:
         configure_auth(Path(sys.argv[2]))
         configure_text_chat(Path(sys.argv[2]))
