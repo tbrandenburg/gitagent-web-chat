@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 # Can be called from ANY GitAgent-compatible folder:
-#   /path/to/web-agent.sh start /path/to/my-agent
+#   /path/to/scripts/web-agent.sh start /path/to/my-agent
 COMMAND="${1:-start}"
 AGENT_DIR="${2:-$PWD}"
 AGENT_DIR="$(cd "$AGENT_DIR" && pwd)"
-LAUNCHER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+LAUNCHER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 if [[ ! -f "$AGENT_DIR/agent.yaml" ]]; then
   echo "Missing $AGENT_DIR/agent.yaml (GitAgent agent folder required)" >&2; exit 1
 fi
@@ -15,6 +15,30 @@ fi
 PORT="${CHAT_PORT_OVERRIDE:-${CHAT_PORT:-3333}}"
 NAME="gitagent-$(printf %s "$AGENT_DIR" | sha256sum | cut -c1-12)"
 IMAGE="${GITAGENT_IMAGE:-node:22-bookworm-slim}"
+wait_for_http() {
+  local url="$1" timeout="$2" elapsed=0 status
+  printf 'Waiting for %s to respond at %s' "$NAME" "$url"
+  while ((elapsed < timeout)); do
+    status="$(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 2 "$url" 2>/dev/null || true)"
+    if [[ "$status" =~ ^[23][0-9]{2}$ || "$status" == 401 ]]; then
+      printf '\nReady: %s is available at %s (HTTP %s)\n' "$NAME" "$url" "$status"
+      return 0
+    fi
+    if [[ "$(docker inspect --format '{{.State.Running}}' "$NAME" 2>/dev/null || true)" != true ]]; then
+      printf '\n%s stopped before becoming ready. Recent container logs:\n' "$NAME" >&2
+      docker logs --tail 60 "$NAME" >&2 || true
+      return 1
+    fi
+    sleep 1
+    ((elapsed += 1))
+    if ((elapsed % 5 == 0)); then
+      printf '\nStill waiting for %s (%ss elapsed)' "$NAME" "$elapsed"
+    fi
+  done
+  printf '\n%s did not respond at %s within %ss. Recent container logs:\n' "$NAME" "$url" "$timeout" >&2
+  docker logs --tail 60 "$NAME" >&2 || true
+  return 1
+}
 case "$COMMAND" in
  start)
    if [[ ! "$PORT" =~ ^[0-9]{1,5}$ ]] || ((10#$PORT < 1 || 10#$PORT > 65535)); then
@@ -74,9 +98,27 @@ case "$COMMAND" in
          "
       ' >/dev/null
   fi
-  echo "Starting $NAME at http://localhost:$PORT (first start installs dependencies)"
+   echo "Started container $NAME; waiting for GitAgent (first start installs dependencies)."
+   wait_for_http "http://127.0.0.1:$PORT/" 300
   ;;
  stop) docker rm -f "$NAME" ;;
+ refresh)
+    if docker container inspect "$NAME" >/dev/null 2>&1; then
+      docker restart "$NAME" >/dev/null
+    else
+      "$0" start "$AGENT_DIR"
+    fi
+    for attempt in {1..180}; do
+      if docker exec "$NAME" okf validate; then
+        echo "Refreshed $NAME from $AGENT_DIR; OKF bundle is visible and valid"
+        exit 0
+      fi
+      sleep 1
+    done
+    echo "GitAgent did not become ready within 180 seconds" >&2
+    docker logs --tail 60 "$NAME" >&2
+    exit 1
+   ;;
  logs) docker logs -f "$NAME" ;;
  status) docker ps -a --filter "name=^/${NAME}$" ;;
  shell) docker exec -it "$NAME" bash ;;
@@ -88,5 +130,5 @@ case "$COMMAND" in
      exec node /agent/tests/live-chat.mjs
    '
    ;;
- *) echo "Usage: $0 {start|stop|logs|status|shell|test} [agent-folder]" >&2; exit 2 ;;
+ *) echo "Usage: $0 {start|stop|refresh|logs|status|shell|test} [agent-folder]" >&2; exit 2 ;;
 esac

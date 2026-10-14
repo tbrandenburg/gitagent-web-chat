@@ -12,6 +12,12 @@ architecture, conventions, or previous work:
 2. Read only concept files relevant to the question and follow pertinent links.
    Do not preload the entire tree. If the route is unclear, use the `cli` tool to
    run `okf search "search terms"`, then `read` the matching specific files.
+   For general or multi-shift production questions, use
+   `knowledge/production/production-data-overview.md` and
+   `knowledge/production/shift-production-register.md` as the canonical sample
+   sources; open the quality or downtime rollup when those details are requested.
+   Use `production-line-example.md` only when a question explicitly asks for the
+   compact two-shift example or its original regression-test figures.
 3. Prefer current, human-verified sources; consider `sources`, `verified`,
    `status` and `stale_after`. Treat draft, deprecated, stale or unverified
    content cautiously. Distinguish known facts from guesses.

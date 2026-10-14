@@ -1,8 +1,8 @@
 ---
 type: Synthetic Dataset
-title: Example production line dataset
-description: Fabricated shift-level production observations for testing and demonstrations; not real plant telemetry.
-tags: [synthetic, manufacturing, production-line, example-data]
+title: Compact two-shift regression example
+description: Two fabricated shifts retained for simple demos and regression tests; use the five-day shift register for general production questions.
+tags: [synthetic, manufacturing, production-line, compact-example, regression-test]
 status: stable
 provenance: Fully fabricated example data; no real facility, worker, machine, or production records are represented.
 time_zone: UTC
@@ -11,6 +11,8 @@ time_zone: UTC
 # Overview
 
 This small, deterministic dataset represents two shifts on a fictional packaging line. Every value is invented for software examples, tests, and demonstrations. It must not be used for operational decisions, safety decisions, forecasting, or claims about actual manufacturing performance.
+
+For general or multi-shift production questions, use the five-day [shift production register](shift-production-register.md) and [dataset overview](production-data-overview.md) instead.
 
 # Schema
 

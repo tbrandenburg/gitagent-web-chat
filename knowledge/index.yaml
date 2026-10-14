@@ -1,7 +1,37 @@
-# GitAgent-specific adapter: preload ONLY the OKF navigation map.
-# This is not the OKF spec's index (that is index.md).
+# GitAgent-specific adapter: preload the root map and expose navigable OKF files
+# for on-demand reads. This is not the OKF spec's index (that is index.md).
 entries:
   - path: index.md
     priority: high
     tags: [okf, navigation]
     always_load: true
+  - path: production/index.md
+    priority: high
+    tags: [okf, navigation, production]
+  - path: production/production-data-overview.md
+    priority: high
+    tags: [production, synthetic, metrics]
+  - path: production/shift-production-register.md
+    priority: high
+    tags: [production, synthetic, shifts, register]
+  - path: production/quality-defect-rollup.md
+    priority: medium
+    tags: [production, synthetic, quality, defects]
+  - path: production/downtime-reason-rollup.md
+    priority: medium
+    tags: [production, synthetic, downtime]
+  - path: production/production-line-example.md
+    priority: low
+    tags: [production, synthetic, compact-example, regression-test]
+  - path: operations/index.md
+    priority: medium
+    tags: [okf, navigation, operations]
+  - path: operations/web-chat.md
+    priority: medium
+    tags: [operations, deployment]
+  - path: decisions/index.md
+    priority: low
+    tags: [okf, navigation, decisions]
+  - path: decisions/okf-progressive-disclosure.md
+    priority: low
+    tags: [okf, architecture, progressive-disclosure]

@@ -8,6 +8,7 @@ description: Consult, search, add, maintain, and validate project knowledge in t
 2. Read the relevant nested `knowledge/<topic>/index.md` using the `read` tool.
 3. Read only the matching concept Markdown with `read`. Follow links to other concepts if needed.
 4. If the path is not obvious, call `cli` with `okf search "keywords"`; it returns paths, titles, summaries and trust/freshness indicators, **not all document bodies**. Read matches individually.
+   For general or multi-shift production questions, prefer the production topic's overview and shift register. The compact two-shift production example is for explicitly requested compact examples or regression-test figures only.
 5. Cite `knowledge/<relative path>` in the answer. Check sources, `verified`, `status`, and `stale_after` before relying on contested claims.
 
 # Maintain the bundle when requested

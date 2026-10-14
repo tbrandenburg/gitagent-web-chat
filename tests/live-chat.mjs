@@ -51,7 +51,7 @@ await new Promise((resolve, reject) => {
       socket.send(JSON.stringify({
         type: 'text',
         text: production
-          ? 'Read the OKF production knowledge. Report both shift IDs, units produced, good units, downtime, total produced and total rejected units. Explain whether these are real measurements and suitable for safety decisions. Cite the source path. Do not change files or memory.'
+          ? 'For the general five-day production sample, follow the production topic index and use its canonical overview and shift register, not the compact two-shift regression example. Report total produced, good, rejected, and downtime across all ten shifts, and name the register and overview source paths. Explain whether these are real measurements or suitable for safety decisions. Do not change files or memory.'
           : mcp
             ? 'Use Context7 MCP to resolve the React library ID and then query its useEffect cleanup documentation. You must call both tools in this request, not reuse past results. Do not substitute shell, web search, or remembered documentation. Explain cleanup on dependency changes and unmount and cite the returned library ID. Do not change files or memory.'
             : 'Reply with exactly: LUNA_CHAT_OK. Do not use tools, write files, or update memory.',
@@ -64,14 +64,14 @@ await new Promise((resolve, reject) => {
     if (message.type === 'agent_done') {
       try {
         if (production) {
-          assert.match(message.result, /SYN-LINE-A-2025-02-03-D/);
-          assert.match(message.result, /SYN-LINE-A-2025-02-03-N/);
-          for (const value of [/7,?920/, /7,?801/, /7,?488/, /7,?376/, /24/, /41/, /15,?408/, /231/]) {
+          for (const value of [/79,?860/, /78,?456/, /1,?404/, /257/]) {
             assert.match(message.result, value);
           }
           assert.match(message.result, /fabricated|fictional|synthetic/i);
           assert.match(message.result, /(?:not|unsuitable)[^\n]{0,140}safety/i);
-          assert.match(message.result, /knowledge\/production\/production-line-example\.md/);
+          assert.match(message.result, /knowledge\/production\/shift-production-register\.md/);
+          assert.match(message.result, /knowledge\/production\/production-data-overview\.md/);
+          assert.doesNotMatch(message.result, /knowledge\/production\/production-line-example\.md/);
         } else if (mcp) {
           for (const name of ['resolve-library-id', 'query-docs']) {
             const result = results.find((value) => value.toolName === `context7__${name}`);
