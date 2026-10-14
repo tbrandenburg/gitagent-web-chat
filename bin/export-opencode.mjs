@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { mcpConfig } from './mcp-config.mjs';
 
 const dir = resolve(process.argv[2] ?? process.cwd());
 const root = process.env.OPENGAP_ROOT ?? '/usr/local/lib/node_modules/@open-gitagent/opengap';
@@ -23,11 +24,12 @@ const entry = { name: model, modelID: model };
 if (provider === 'openai' && model === 'gpt-6-luna') {
   entry.package = '@opencode/ai/providers/openai/responses';
 }
-// OpenGAP 0.5.0 exports V1 config; retain its instructions and emit native V2 config.
+// Retain upstream instructions and translate model/MCP settings into native V2.
 const config = {
   $schema: 'https://opencode.ai/config.json',
   model: `${provider}/${model}`,
   providers: { [provider]: { models: { [model]: entry } } },
+  mcp: { servers: mcpConfig(exported.config.mcpServers) },
 };
 writeFileSync(join(dir, 'AGENTS.md'), instructions);
 writeFileSync(join(dir, 'opencode.json'), `${JSON.stringify(config, null, 2)}\n`);

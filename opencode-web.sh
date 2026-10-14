@@ -28,7 +28,9 @@ case "$COMMAND" in
        -p "127.0.0.1:${PORT}:4096" \
        -v "$AGENT_DIR:/source-agent:ro" \
        -v "$LAUNCHER_DIR/bin/export-opencode.mjs:/export-opencode.mjs:ro" \
+       -v "$LAUNCHER_DIR/bin/mcp-config.mjs:/mcp-config.mjs:ro" \
        -v "$LAUNCHER_DIR/bin/okf:/usr/local/bin/okf:ro" \
+       -v "$LAUNCHER_DIR/tests:/launcher-tests:ro" \
        -e OPENAI_API_KEY -e OPENCODE_SERVER_PASSWORD -e OKF_ROOT=/workspace/knowledge \
        "$IMAGE" bash -lc '
          set -euo pipefail
@@ -54,5 +56,13 @@ case "$COMMAND" in
  logs) docker logs -f "$NAME" ;;
  status) docker ps -a --filter "name=^/${NAME}$" ;;
  shell) docker exec -it "$NAME" bash ;;
- *) echo "Usage: $0 {start|stop|logs|status|shell} [agent-folder]" >&2; exit 2 ;;
+ test-mcp)
+   docker exec -w /workspace "$NAME" sh -c '
+      if [ -f /launcher-tests/live-opencode-mcp.mjs ]; then
+        exec node /launcher-tests/live-opencode-mcp.mjs
+      fi
+      exec node /source-agent/tests/live-opencode-mcp.mjs
+    '
+   ;;
+ *) echo "Usage: $0 {start|stop|logs|status|shell|test-mcp} [agent-folder]" >&2; exit 2 ;;
 esac

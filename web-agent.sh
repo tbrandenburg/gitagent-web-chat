@@ -81,7 +81,7 @@ case "$COMMAND" in
  status) docker ps -a --filter "name=^/${NAME}$" ;;
  shell) docker exec -it "$NAME" bash ;;
  test)
-   docker exec "$NAME" sh -c '
+   docker exec -e LIVE_CHAT_SCENARIO="${LIVE_CHAT_SCENARIO:-smoke}" "$NAME" sh -c '
      if [ -f /launcher-tests/live-chat.mjs ]; then
        exec node /launcher-tests/live-chat.mjs
      fi
