@@ -42,6 +42,19 @@ class OKFTests(unittest.TestCase):
         self.assertIn('# Operations', document)
         self.assertIn('gitagent --voice gemini', document)
 
+    def test_synthetic_production_data_is_discoverable_and_explicitly_fictional(self):
+        root_index = self.run_okf('index')
+        self.assertIn('[Synthetic production data](production/)', root_index)
+        topic_index = self.run_okf('index', 'production')
+        self.assertIn('production-line-example.md', topic_index)
+        search = self.run_okf('search', 'production line synthetic')
+        self.assertIn('production/production-line-example.md', search)
+        document = self.run_okf('read', 'production/production-line-example.md')
+        self.assertIn('Fully fabricated example data', document)
+        self.assertIn('must not be used for operational decisions', document)
+        self.assertIn('SYN-LINE-A-2025-02-03-D', document)
+        self.assertIn('7,920', document)
+
     def test_path_traversal_blocked(self):
         self.run_okf('read', '../../etc/passwd', expected=2)
         self.run_okf('index', '../', expected=2)
