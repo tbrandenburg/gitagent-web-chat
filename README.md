@@ -62,6 +62,46 @@ make logs   # Follow logs; Ctrl+C stops following
 make down   # Remove the container; host agent files remain
 ```
 
+## SkillsFlow echo demo (GitAgent only)
+
+A minimal [GitAgent SkillsFlow](workflows/echo-chain.yaml) chains three independent
+read-only skills to demonstrate step ordering and how plain-text context
+passes between model calls:
+
+`echo-start` → `echo-middle` → `echo-end`
+
+Start GitAgent with `make up` (or `make refresh` if it is already running).
+In **GitAgent web chat** at http://localhost:3333, send:
+
+```text
+@echo-chain hello GitAgent
+```
+
+The `@echo-chain` prefix dispatches the YAML flow directly; a natural-language
+request such as "run echo-chain" does **not** reliably trigger the flow.
+The remainder of the message becomes `{input}`. For this demo, use a short
+**single-line** value. Each skill is asked to output one line:
+
+```text
+ECHO_START: hello GitAgent
+ECHO_MIDDLE: hello GitAgent
+ECHO_END: hello GitAgent
+```
+
+This is a demonstration of **LLM-invoked skills, not a deterministic shell
+`echo`**: the model may deviate from exact copying. GitAgent 2.2.0's flow
+runner shows start/step-completion events in the browser but currently does
+**not display each skill's response text** there. The labels above are the
+requested *internal* step outputs, not a promised browser transcript.
+No tools, external services, or approval gates are needed beyond the model.
+
+The flow is defined by `steps:` in
+[workflows/echo-chain.yaml](workflows/echo-chain.yaml). Each entry names a skill
+and a prompt; results from earlier steps are appended to later prompts.
+Check the configuration offline with `python3 -m unittest tests.test_echo_flow`
+(or `make test`). That test checks definitions and ordering, **not** actual
+model responses. This sample is not exported as an executable OpenCode V2 flow.
+
 ## Commands
 
 Run commands from this repository. Most accept `AGENT_DIR=/absolute/path/to/agent`.
