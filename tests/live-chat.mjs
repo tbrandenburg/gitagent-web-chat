@@ -5,6 +5,7 @@ const require = createRequire('/usr/local/lib/node_modules/@open-gitagent/voice/
 const WebSocket = require('ws');
 const base = 'http://127.0.0.1:3333';
 const password = process.env.GITAGENT_PASSWORD ?? '';
+const production = process.env.LIVE_CHAT_SCENARIO === 'production';
 const headers = {};
 const health = await fetch(`${base}/health`, { signal: AbortSignal.timeout(10000) });
 assert.equal(health.status, 200);
@@ -46,7 +47,9 @@ await new Promise((resolve, reject) => {
     if (message.type === 'transcript' && (message.text === 'Text chat ready.' || message.text.includes('Voice mode unavailable'))) {
       socket.send(JSON.stringify({
         type: 'text',
-        text: 'Reply with exactly: LUNA_CHAT_OK. Do not use tools, write files, or update memory.',
+        text: production
+          ? 'Read the OKF production knowledge. Report both shift IDs, units produced, good units, downtime, total produced and total rejected units. Explain whether these are real measurements and suitable for safety decisions. Cite the source path. Do not change files or memory.'
+          : 'Reply with exactly: LUNA_CHAT_OK. Do not use tools, write files, or update memory.',
       }));
     }
     if (message.type === 'error') {
@@ -54,7 +57,18 @@ await new Promise((resolve, reject) => {
     }
     if (message.type === 'agent_done') {
       try {
-        assert.match(message.result, /LUNA_CHAT_OK/);
+        if (production) {
+          assert.match(message.result, /SYN-LINE-A-2025-02-03-D/);
+          assert.match(message.result, /SYN-LINE-A-2025-02-03-N/);
+          for (const value of [/7,?920/, /7,?801/, /7,?488/, /7,?376/, /24/, /41/, /15,?408/, /231/]) {
+            assert.match(message.result, value);
+          }
+          assert.match(message.result, /fabricated|fictional|synthetic/i);
+          assert.match(message.result, /(?:not|unsuitable)[^\n]{0,140}safety/i);
+          assert.match(message.result, /knowledge\/production\/production-line-example\.md/);
+        } else {
+          assert.match(message.result, /LUNA_CHAT_OK/);
+        }
         assert.doesNotMatch(message.result, /Error:|Unauthorized|model_not_found/i);
         console.log(`Real WebSocket model response: ${message.result.trim()}`);
         finish();

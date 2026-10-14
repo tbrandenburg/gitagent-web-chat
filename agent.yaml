@@ -6,5 +6,8 @@ model:
   preferred: "openai:gpt-6-luna"
   fallback: []
 tools: [cli, read, write, memory]
+mcp_servers:
+  context7:
+    url: https://mcp.context7.com/mcp
 runtime:
   max_turns: 50

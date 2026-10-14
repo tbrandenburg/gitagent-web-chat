@@ -4,6 +4,8 @@ import subprocess
 import tempfile
 import unittest
 
+import yaml
+
 BASE = Path(__file__).resolve().parents[1]
 
 
@@ -37,6 +39,12 @@ class OpenCodeTests(unittest.TestCase):
         self.assertIn('GITAGENT_PASSWORD=password', example)
         self.assertIn('OPENCODE_SERVER_PASSWORD=password', example)
         self.assertIn('fixed username opencode', example)
+
+    def test_manifest_declares_context7_without_credentials(self):
+        manifest = yaml.safe_load((BASE / 'agent.yaml').read_text())
+        server = manifest['mcp_servers']['context7']
+        self.assertEqual(server, {'url': 'https://mcp.context7.com/mcp'})
+        self.assertNotIn('headers', server)
 
     def test_port_override_beats_agent_env(self):
         (self.agent / '.env').write_text('OPENCODE_PORT=4096\n')

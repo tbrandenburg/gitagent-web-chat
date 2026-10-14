@@ -4,7 +4,7 @@ PORT ?=
 OPENCODE_PORT ?=
 export CHAT_PORT_OVERRIDE := $(PORT)
 export OPENCODE_PORT_OVERRIDE := $(OPENCODE_PORT)
-.PHONY: up down logs status shell validate search test lint test-live up-opencode down-opencode logs-opencode status-opencode shell-opencode
+.PHONY: up down logs status shell validate search test lint test-live test-production-live test-mcp-live up-opencode down-opencode logs-opencode status-opencode shell-opencode
 
 up:
 	./web-agent.sh start "$(AGENT_DIR)"
@@ -29,15 +29,24 @@ search:
 
 test:
 	python3 -m unittest discover -s tests -v
+	node --test tests/mcp-config.test.mjs
 
 lint:
 	bash -n web-agent.sh
 	bash -n opencode-web.sh
 	node --check bin/export-opencode.mjs
+	node --check bin/mcp-config.mjs
 	node --check tests/live-chat.mjs
+	node --check tests/live-opencode-mcp.mjs
 
 test-live:
 	./web-agent.sh test "$(AGENT_DIR)"
+
+test-production-live:
+	LIVE_CHAT_SCENARIO=production ./web-agent.sh test "$(AGENT_DIR)"
+
+test-mcp-live:
+	./opencode-web.sh test-mcp "$(AGENT_DIR)"
 
 up-opencode:
 	./opencode-web.sh start "$(AGENT_DIR)"

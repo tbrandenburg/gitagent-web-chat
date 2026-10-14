@@ -64,6 +64,9 @@ GitHub Actions runs `make lint test validate` on pull requests and `main`.
 Once the server is ready, `make test-live` checks HTTP/WebSocket access, login
 when enabled, and a real model response (uses API tokens).
 This checks backend transport, not whether the UI renders replies.
+`make test-production-live` asks the real chat to read the synthetic dataset,
+checks shift figures and totals (15,408 produced, 231 rejected), and requires
+the safety warning and source citation. It also uses API tokens.
 
 ## Upstream compatibility
 
@@ -142,13 +145,51 @@ A small compatibility helper writes native V2 configuration and explicitly
 appends the OKF root navigation map, which OpenGAP's `documents`-based knowledge
 export would otherwise miss in this repo's `entries`-based index. It registers
 the manifest's preferred model, using the Responses API for `gpt-6-luna`.
-This is an instruction/model adapter, not full translation of GitAgent hooks,
-custom tools, MCP connections, or compliance enforcement.
+The helper also translates OpenGAP MCP declarations to native V2 configuration.
+It is not full translation of GitAgent hooks, custom tools, or compliance
+enforcement.
 
 Verified in a disposable Docker workspace: native V2 export, password-protected
 startup, a real `gpt-6-luna` response in the CLI, a live-rendered browser reply,
 and browser-driven reading of the OKF decision document. This alternative does
 not use the GitAgent voice frontend or its text-only rendering path.
+
+### Context7 MCP through OpenGAP
+
+Declare MCP servers in `agent.yaml` using OpenGAP's `mcp_servers` field:
+
+```yaml
+mcp_servers:
+  context7:
+    url: https://mcp.context7.com/mcp
+```
+
+This repo configures the public endpoint without an API key, headers, or OAuth
+credentials. Anonymous access was verified with real tool calls; availability
+and rate limits are controlled by Context7 and may change. The separate
+`/mcp/oauth` endpoint requires sign-in and is not used here. The model still
+requires `OPENAI_API_KEY`; keyless refers only to Context7.
+
+OpenGAP 0.5.0 exports a top-level `mcpServers` object, which is not OpenCode V2's
+native shape. `bin/export-opencode.mjs` translates it into `mcp.servers` with
+`type: remote` and the URL. Local declarations use `command`, `args`, and `env`;
+the helper converts those into a command array and `environment`, and translates
+`${VAR}` placeholders into V2's `{env:VAR}` syntax. It does not add host environment
+variables to the container; credential-dependent servers need explicit launch
+environment wiring.
+
+Start with `make up-opencode`. The launcher copies/exports the agent only on
+first startup: an existing OpenCode container must be recreated to pick up source
+changes (`make down-opencode` removes its runtime sessions and edits).
+Run `make test-mcp-live` after startup to verify keyless configuration, successful
+`resolve-library-id` and `query-docs` calls through a real model session, and
+the runtime's connected status. This consumes model API tokens, not a Context7
+API key, and checks tool execution rather than merely trusting the model's answer.
+
+Sources: [OpenGAP 0.5.0 manifest schema](https://github.com/open-gitagent/opengap/blob/v0.5.0/spec/schemas/agent-yaml.schema.json),
+[OpenGAP OpenCode exporter](https://github.com/open-gitagent/opengap/blob/v0.5.0/src/adapters/opencode.ts),
+[OpenCode V2 MCP configuration](https://opencode.ai/v2/docs/mcp-servers), and
+[Context7 MCP README](https://github.com/upstash/context7/blob/master/packages/mcp/README.md).
 
 ## How OKF is considered
 
