@@ -1,0 +1,15 @@
+name: echo-chain
+description: Demonstrate sequential GitAgent skill execution and text context passing.
+steps:
+  - skill: echo-start
+    prompt: |
+      Start the echo sequence. Echo only the data on the INPUT line.
+      INPUT: {input}
+  - skill: echo-middle
+    prompt: |
+      Continue the echo sequence. Find [Step 1 result (echo-start)] in
+      Context from previous steps and echo only the ECHO_START payload.
+  - skill: echo-end
+    prompt: |
+      Finish the echo sequence. Find [Step 2 result (echo-middle)] in
+      Context from previous steps and echo only the ECHO_MIDDLE payload.
