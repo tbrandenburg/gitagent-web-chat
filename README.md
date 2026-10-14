@@ -1,97 +1,87 @@
-# Portable GitAgent web chat with OKF
+# GitAgent web chat with OKF
 
-This directory **is the agent**, not a deployment wrapper. It includes `agent.yaml`,
-`SOUL.md`, `RULES.md`, `knowledge/` (OKF v0.2), and `skills/`. Host-side Docker
-launchers live in `scripts/`; `Makefile` provides the project commands.
-The configured text model is `openai:gpt-6-luna`.
+[![Checks](https://github.com/tbrandenburg/gitagent-web-chat/actions/workflows/checks.yml/badge.svg)](https://github.com/tbrandenburg/gitagent-web-chat/actions/workflows/checks.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-## Scope
+**Run a portable, knowledge-aware agent in your browser.** This proof of concept
+packages a GitAgent agent, an Open Knowledge Format (OKF v0.2) knowledge base,
+and Docker launchers for two upstream chat interfaces. The configured model is
+`openai:gpt-6-luna`.
 
-This is a minimal **agent + OKF** example, not a web application. `make up`
-starts the off-the-shelf GitAgent web UI in Docker; this repo does not implement
-its own UI, chat server, or model client.
+- **Try knowledge retrieval:** ask about fictional production data and trace
+  answers to source files.
+- **Bring your own agent:** point the launchers at another folder containing
+  `agent.yaml`.
+- **Choose a frontend:** use GitAgent or the optional OpenCode V2 runtime.
+- **Explore MCP tools:** the manifest includes the public Context7 endpoint.
 
-GitAgent 2.2.0 ships its web UI in `@open-gitagent/voice` and exposes it through
-`--voice`; there is no separate `--web` flag. The launcher's `--voice gemini`
-selects the upstream text-only fallback without providing a Gemini key.
-Text requests use OpenAI only. The voice-named package and launch flag are
-upstream requirements, not a Gemini integration implemented in this repo.
-Removing them would remove the upstream web UI.
-An optional OpenCode V2 launcher uses a separate upstream frontend and runtime;
-it does not add a custom UI to this repo.
+This is an experimental localhost demo with upstream interfaces and guarded
+runtime compatibility fixes. It does not include a custom chat server or UI.
 
-## Run
+[Quick start](#quick-start) · [Commands](#commands) ·
+[Configuration](#configuration) · [Knowledge](#knowledge-and-example-prompts) ·
+[OpenCode](#optional-opencode-v2) · [Troubleshooting](#troubleshooting) ·
+[Development](#development)
+
+## Quick start
+
+### Prerequisites
+
+- A Linux shell, or Linux under WSL2, with Bash, GNU Make, Git, `curl`, and `sha256sum`.
+- Docker installed, running, and accessible to your user.
+- An OpenAI API key with access to the model in [agent.yaml](agent.yaml).
+- Internet access for first-start package installation and model requests.
+
+Node.js and Python for chat are installed inside the container. Host-side
+validation and tests have [additional requirements](#development).
 
 ```sh
-# OPENAI_API_KEY must be exported in your shell; no .env is needed.
+git clone https://github.com/tbrandenburg/gitagent-web-chat.git
+cd gitagent-web-chat
+export OPENAI_API_KEY="your-openai-api-key"
 make up
-make logs
 ```
 
-Open http://localhost:3333. The initial startup installs runtime packages
-inside the container, so it can take a few minutes. `make up` shows elapsed-time
-progress and returns once the HTTP server responds; startup failures include
-recent container logs. `make down` removes the
-container, **not** the agent folder. `make validate` validates the OKF bundle.
-Sign in with **username `admin`, password `password`**. No `.env` is needed
-when `OPENAI_API_KEY` is exported in your shell.
-On narrow screens, close the **File System** inspector before chatting; the
-upstream inspector is an overlay on phones and uses chat space on tablets.
+Open **[http://localhost:3333](http://localhost:3333)**. Sign in with username
+**`admin`** and password **`password`**. These are demo credentials; change
+them before any non-local use. The port is bound to `127.0.0.1`.
 
-Authentication is enabled by default with **demo-only credentials**. Override
-`GITAGENT_USERNAME` and `GITAGENT_PASSWORD` in your shell or a local `.env`
-copied from `.env.example`. Set `GITAGENT_AUTH=false` to disable GitAgent login.
-Never expose the demo password publicly; change it before any non-local use.
-After changing environment settings, use `make down` then `make up` to recreate
-the GitAgent container; `make up` reuses an existing container's configuration.
-For source or knowledge updates, `make refresh` updates both GitAgent and the
-copied OpenCode workspace in one command.
-The port is bound to `127.0.0.1`, not exposed on the network.
-GitAgent runs as your host UID/GID. Its automatic Git commits use separate,
-container-local metadata in `/runtime/git`, leaving the host repo's index and
-history untouched. `make down` discards this runtime history; agent files persist.
-`GITAGENT_MODEL_BASE_URL` defaults to `https://api.openai.com/v1` so the runtime
-can use `gpt-6-luna` without depending on its bundled model registry.
-The launcher pins GitAgent 2.2.0 and voice 1.0.0, and applies a guarded
-container-only adapter for `gpt-6-luna` to use OpenAI's Responses API. GitAgent's
-default custom-model Chat Completions path rejects this model's reasoning/tools
-combination. Other custom models keep their existing API selection.
-The same adapter replaces two broken CommonJS crypto imports in the pinned
-ESM authentication server, allowing the upstream login flow to work.
-Two guarded server-side text transport fixes send replies through the upstream
-transcript renderer and replace the layout-breaking voice warning with a normal
-"Text chat ready" message. The server also handles the missing favicon request
-with HTTP 204 and reuses the upstream compact layout up to 900 px by adapting
-the served breakpoint. No frontend file is modified or vendored.
+First startup can take a few minutes. The launcher shows elapsed-time progress
+and returns when HTTP responds, including a login-required response. Startup
+failures include recent container logs. On phones and tablets, close the
+**File System** inspector to make room for the conversation.
 
-Run `make test` for the offline regression suite and `make lint` for shell syntax.
-GitHub Actions runs `make lint test validate` on pull requests and `main`.
-Once the server is ready, `make test-live` checks HTTP/WebSocket access, login
-when enabled, and a real model response (uses API tokens).
-This checks backend transport, not whether the UI renders replies.
-`make test-production-live` asks the real chat to read the synthetic dataset,
-checks shift figures and totals (15,408 produced, 231 rejected), and requires
-the safety warning and source citation. It also uses API tokens.
+Try this prompt:
 
-## Upstream compatibility
+> Read the five-day production sample. Report total produced, good, rejected,
+> and downtime across all ten shifts. Cite the overview and shift register,
+> and explain whether these are real measurements. Do not change files or memory.
 
-Playwright testing of the unadapted pinned upstream text-only runtime found:
+```sh
+make logs   # Follow logs; Ctrl+C stops following
+make down   # Remove the container; host agent files remain
+```
 
-- On desktop, the voice warning consumes layout space and the file panel can
-  cover the Send button. At 768 px, the page also overflows horizontally.
-- Text responses arrive over WebSocket as `agent_done.result`, but the UI does
-  not render them live. Reloading the page restores saved responses; closing the
-  file panel may be necessary to see the conversation.
-- Follow-up context and reading this repo's OKF documents work on the backend.
+## Commands
 
-The container-only server fixes above address the missing replies and warning
-layout without forking the frontend. This remains a localhost-only experimental
-PoC; optional messaging, scheduling, and voice features are outside its scope.
-Verified with real Playwright interactions: demo login, live replies, follow-up
-context, OKF file retrieval, empty-input handling, and chat layouts at 320, 375,
-414, 768, and 1280 px with the narrow-screen inspector closed.
+Run commands from this repository. Most accept `AGENT_DIR=/absolute/path/to/agent`.
 
-## Run from any other GitAgent-compatible folder
+| Task | GitAgent | OpenCode V2 |
+| --- | --- | --- |
+| Start or reuse a container | `make up` | `make up-opencode` |
+| Follow logs | `make logs` | `make logs-opencode` |
+| Inspect status | `make status` | `make status-opencode` |
+| Open a container shell | `make shell` | `make shell-opencode` |
+| Remove the container | `make down` | `make down-opencode` |
+
+After editing knowledge or agent instructions, run **`make refresh`**. It
+validates the selected knowledge bundle, restarts GitAgent, and refreshes
+OpenCode's copied knowledge, identity, rules, manifest, and skills before
+re-exporting its configuration. It starts either runtime if its container is
+missing, so it requires an API key and host-side Python with PyYAML.
+It does not copy arbitrary OpenCode workspace files.
+
+### Use another agent folder
 
 ```sh
 make up AGENT_DIR=/absolute/path/to/other-agent PORT=3334
@@ -99,71 +89,116 @@ make logs AGENT_DIR=/absolute/path/to/other-agent
 make down AGENT_DIR=/absolute/path/to/other-agent
 ```
 
-That folder must contain `agent.yaml`; it does not need the launcher, Makefile,
-or compatibility adapter. The launcher mounts its helper from this repo, and
-GitAgent uses the model in the selected manifest without a CLI override.
-The folder inherits `OPENAI_API_KEY` from your
-shell. Its optional `.env` can override settings such as `CHAT_PORT` (use a
-distinct port per agent), demo credentials, or `GITAGENT_AUTH=false`.
-The launcher mounts the folder as `/agent` and does not copy any files into it.
-To give another agent OKF, copy `knowledge/`, `RULES.md` (merge rules if present),
-and `skills/okf-knowledge/` into that folder.
+The folder needs `agent.yaml`; helpers are mounted from this repo. The selected
+manifest supplies the model, and the folder's optional `.env` supplies its
+settings. Use distinct ports for simultaneous agents. `PORT=` overrides
+`CHAT_PORT`; `OPENCODE_PORT=` overrides the OpenCode environment setting.
 
-`PORT=` overrides the selected agent's `CHAT_PORT`; without an override its
-environment setting is respected. `make validate` and `make search` also accept
-`AGENT_DIR=`. A separate port is required for simultaneous agents.
-The launcher also mounts the `okf` utility, so an external agent folder does not
-need its own `bin/` directory for knowledge searches.
+To add OKF, copy `knowledge/` and `skills/okf-knowledge/`, then merge the
+knowledge rules from `RULES.md` into the other agent's rules. The launcher
+mounts the `okf` utility, so that folder does not need its own `bin/` directory.
 
-## Optional OpenCode V2 frontend
+## Configuration
+
+An exported `OPENAI_API_KEY` is enough to start. For local overrides, copy
+[.env.example](.env.example) to `.env` in the selected agent folder and edit it.
+The launchers source `.env` as Bash; use trusted files and shell-safe values.
+Local values override inherited environment values, while explicit Make port
+overrides take precedence over both.
+
+| Setting | Default | Purpose |
+| --- | --- | --- |
+| `OPENAI_API_KEY` | Required | Authenticate model requests |
+| `CHAT_PORT` | `3333` | GitAgent host port; override with `PORT=` |
+| `GITAGENT_AUTH` | `true` | Set to `false` to disable GitAgent login |
+| `GITAGENT_USERNAME` | `admin` | GitAgent username |
+| `GITAGENT_PASSWORD` | `password` | GitAgent demo password |
+| `GITAGENT_MODEL_BASE_URL` | `https://api.openai.com/v1` | GitAgent model API base URL |
+| `OPENCODE_PORT` | `4096` | OpenCode host port |
+| `OPENCODE_SERVER_PASSWORD` | `GITAGENT_PASSWORD`, or `password` | OpenCode password; authentication is required |
+
+Change the preferred model in [agent.yaml](agent.yaml). After environment
+changes, remove and recreate the affected container with `make down` /
+`make up` or `make down-opencode` / `make up-opencode`. Starting an existing
+container reuses its original environment and port mapping.
+
+### What persists?
+
+| Data | GitAgent | OpenCode V2 |
+| --- | --- | --- |
+| Agent source | Mounted read/write from the host | Mounted read-only and copied to `/workspace` |
+| Runtime Git metadata | Isolated in `/runtime/git`; host index and history stay untouched | Created inside `/workspace` |
+| Container restart | Retains runtime data | Retains sessions and workspace edits; refresh replaces the selected agent files |
+| Container removal | Discards runtime Git history; host files remain | Discards sessions and workspace edits; host source remains |
+
+GitAgent runs as your host UID/GID; keep its agent folder writable by that user.
+Both runtimes use `node:22-bookworm-slim` and install packages on first startup.
+No Dockerfile or Compose setup is required. Direct runtime versions are pinned;
+transitive dependencies are not lockfile-pinned.
+
+## Knowledge and example prompts
+
+[knowledge/index.md](knowledge/index.md) is the navigation map.
+[knowledge/index.yaml](knowledge/index.yaml) always loads that root map and
+registers topic indexes and concepts for on-demand reads. Rules guide the agent
+from a topic index to relevant documents. Retrieval is prompt-driven, rather
+than enforced by deterministic middleware.
+
+| Topic | Start here | Example question |
+| --- | --- | --- |
+| Production sample | [Production index](knowledge/production/index.md) | What caused downtime across the five sample days? |
+| Operations | [Operations index](knowledge/operations/index.md) | How is this agent's web chat launched? |
+| Design decisions | [Decision index](knowledge/decisions/index.md) | Why use progressively disclosed knowledge? |
+
+General production questions use the [dataset overview](knowledge/production/production-data-overview.md)
+and [shift register](knowledge/production/shift-production-register.md). The ten
+fictional shifts total **79,860 produced**, **78,456 good**, **1,404 rejected**,
+and **257 minutes of downtime**. Quality and downtime rollups supply category
+details. The older [two-shift example](knowledge/production/production-line-example.md)
+is reserved for explicit compact-example questions.
+
+All sample values are fabricated. They are not plant telemetry and must not guide
+production, quality-release, maintenance, or safety decisions.
+
+Inspect knowledge without a model call:
 
 ```sh
-# OPENAI_API_KEY is inherited from your shell. No other setup is required.
-make up-opencode
-make logs-opencode
-# Browse http://localhost:4096 — password: password
-make down-opencode
+make validate
+make search QUERY="synthetic production shift"
+python3 bin/okf --root knowledge read production/shift-production-register.md
 ```
 
-On the first OpenCode visit, choose **Add project**, select `/workspace`, and
-start a session. That directory is the exported copy of your selected agent.
+## Optional OpenCode V2
 
-For another agent, use
-`make up-opencode AGENT_DIR=/absolute/path/to/other-agent OPENCODE_PORT=4097`.
-`status-opencode` and `shell-opencode` are available too. Explicit port overrides
-take precedence over `.env`. The server can reuse `GITAGENT_PASSWORD` when no
-`OPENCODE_SERVER_PASSWORD` is supplied; otherwise its password defaults to
-`password`. **OpenCode V2 requires authentication** and fixes its HTTP Basic
-username to `opencode`, not `admin`; the browser login asks only for a password.
-Override `OPENCODE_SERVER_PASSWORD` before any non-local use.
+OpenCode uses a separate upstream frontend and runtime with the same source agent.
 
-This launcher installs pinned OpenGAP 0.5.0 and OpenCode CLI 2.0.28, then runs
-`opencode serve`. `make up-opencode` shows elapsed-time progress and returns
-once the HTTP server responds; startup failures include recent container logs.
-The source agent is mounted read-only and copied into a
-container-local workspace, excluding `.env`, Git metadata, runtime memory,
-dependencies, and browser artifacts. Source files remain untouched; OpenCode
-sessions and workspace edits survive a container restart but are lost when the
-container is removed. Runtime packages are installed once per container.
-The mounted `okf` utility uses `OKF_ROOT=/workspace/knowledge` in this runtime.
+```sh
+make up-opencode
+# Open http://localhost:4096
+```
 
-The upstream OpenGAP adapter exports the identity, rules, and skill instructions.
-A small compatibility helper writes native V2 configuration and explicitly
-appends the OKF root navigation map, which OpenGAP's `documents`-based knowledge
-export would otherwise miss in this repo's `entries`-based index. It registers
-the manifest's preferred model, using the Responses API for `gpt-6-luna`.
-The helper also translates OpenGAP MCP declarations to native V2 configuration.
-It is not full translation of GitAgent hooks, custom tools, or compliance
-enforcement.
+Sign in with fixed username **`opencode`** and password **`password`** by
+default (some browser dialogs ask only for the password). On the first visit,
+choose **Add project**, select **`/workspace`**, and start a session.
+For another agent and port:
 
-Verified in a disposable Docker workspace: native V2 export, password-protected
-startup, a real `gpt-6-luna` response in the CLI, a live-rendered browser reply,
-and browser-driven reading of the OKF decision document. This alternative does
-not use the GitAgent voice frontend or its text-only rendering path.
+```sh
+make up-opencode AGENT_DIR=/absolute/path/to/other-agent OPENCODE_PORT=4097
+```
 
-### Context7 MCP through OpenGAP
+The launcher installs OpenGAP **0.5.0** and OpenCode CLI **2.0.28**. Its initial
+copy excludes `.env` files, Git metadata, runtime memory, dependencies, and
+browser artifacts. [bin/export-opencode.mjs](bin/export-opencode.mjs) exports
+identity, rules, skills, the OKF root map, and native V2 model/MCP configuration.
+It selects the Responses API for `gpt-6-luna`. GitAgent hooks, custom tools,
+and compliance enforcement are not fully translated.
 
-Declare MCP servers in `agent.yaml` using OpenGAP's `mcp_servers` field:
+Use `make refresh` for knowledge and instruction changes without deleting the
+container. Before `make down-opencode`, save workspace edits you want to keep.
+
+### Context7 MCP
+
+The manifest declares the public endpoint without Context7 credentials:
 
 ```yaml
 mcp_servers:
@@ -171,69 +206,118 @@ mcp_servers:
     url: https://mcp.context7.com/mcp
 ```
 
-This repo configures the public endpoint without an API key, headers, or OAuth
-credentials. Anonymous access was verified with real tool calls; availability
-and rate limits are controlled by Context7 and may change. The separate
-`/mcp/oauth` endpoint requires sign-in and is not used here. The model still
-requires `OPENAI_API_KEY`; keyless refers only to Context7.
+Availability and rate limits are controlled by Context7; the `/mcp/oauth` endpoint
+is not used. Model requests still require `OPENAI_API_KEY`. Ask the agent to
+resolve the React library ID with Context7, query its `useEffect` cleanup
+documentation, and cite the returned library ID.
 
-OpenGAP 0.5.0 exports a top-level `mcpServers` object, which is not OpenCode V2's
-native shape. `bin/export-opencode.mjs` translates it into `mcp.servers` with
-`type: remote` and the URL. Local declarations use `command`, `args`, and `env`;
-the helper converts those into a command array and `environment`, and translates
-`${VAR}` placeholders into V2's `{env:VAR}` syntax. It does not add host environment
-variables to the container; credential-dependent servers need explicit launch
-environment wiring.
+<details>
+<summary>MCP translation details</summary>
 
-Start with `make up-opencode`. The launcher copies/exports the agent only on
-first startup: an existing OpenCode container must be recreated to pick up source
-changes (`make down-opencode` removes its runtime sessions and edits).
-Run `make test-mcp-live` after startup to verify keyless configuration, successful
-`resolve-library-id` and `query-docs` calls through a real model session, and
-the runtime's connected status. This consumes model API tokens, not a Context7
-API key, and checks tool execution rather than merely trusting the model's answer.
+OpenGAP's `mcpServers` export is translated to native OpenCode V2 `mcp.servers`.
+Remote declarations become `type: remote` entries. Local `command`, `args`, and
+`env` fields become a command array and `environment`; environment placeholders
+become V2's `{env:VAR}` syntax. Credential-dependent servers need explicit
+environment wiring in the launcher; arbitrary host variables are not forwarded.
 
-Context7 also works in the GitAgent frontend started by `make up`.
-The pinned GitAgent 2.2.0 MCP loader defaults URL-only declarations to stdio;
-the guarded container-only helper infers HTTP when a URL is present without a
-transport type or local command. Explicit transports and local commands are
-unchanged. This keeps `agent.yaml` valid for OpenGAP without adding its unsupported
-`type: http` field. An existing GitAgent container needs a restart to apply an
-updated helper; `make up` does not restart a running container.
-Run `make test-gitagent-mcp-live` to verify both real Context7 tool results over
-the authenticated chat WebSocket. It uses model API tokens but no Context7 key.
+For GitAgent 2.2.0, the runtime adapter infers HTTP for URL-only declarations.
+Explicit HTTP/SSE transports and command-based local servers retain their paths.
+This keeps the manifest compatible with OpenGAP without adding `type: http`.
 
-Sources: [OpenGAP 0.5.0 manifest schema](https://github.com/open-gitagent/opengap/blob/v0.5.0/spec/schemas/agent-yaml.schema.json),
-[OpenGAP OpenCode exporter](https://github.com/open-gitagent/opengap/blob/v0.5.0/src/adapters/opencode.ts),
-[OpenCode V2 MCP configuration](https://opencode.ai/v2/docs/mcp-servers), and
+References: [OpenGAP schema](https://github.com/open-gitagent/opengap/blob/v0.5.0/spec/schemas/agent-yaml.schema.json),
+[OpenGAP exporter](https://github.com/open-gitagent/opengap/blob/v0.5.0/src/adapters/opencode.ts),
+[OpenCode V2 MCP docs](https://opencode.ai/v2/docs/mcp-servers), and
 [Context7 MCP README](https://github.com/upstash/context7/blob/master/packages/mcp/README.md).
 
-## How OKF is considered
+</details>
 
-`knowledge/index.yaml` is GitAgent's native knowledge adapter: it always loads
-`knowledge/index.md` and explicitly lists topic indexes and concept documents
-available for on-demand reads. The rules tell the agent to navigate topic
-indexes and then read only relevant concept documents. This is *prompt-driven*
-retrieval, not a mandatory deterministic retrieval middleware.
+## Troubleshooting
 
-The OKF bundle also includes a clearly labeled, fictional five-day production
-packet under `knowledge/production/`: shift output, quality categories, downtime
-categories, and metric definitions. Topic and concept indexes expose summaries
-before documents are read. Its invented values are not operational telemetry or
-suitable for production, quality-release, maintenance, or safety decisions.
+| Symptom | What to do |
+| --- | --- |
+| `Set OPENAI_API_KEY` | Export the key or set it in the selected agent's `.env`. |
+| Docker connection or permission error | Start Docker and check that `docker info` works as your user. |
+| Startup waits or fails | Read the launcher's recent logs, then use `make logs` or `make logs-opencode`. First startup downloads packages. |
+| Port already in use | Choose another `PORT=` or `OPENCODE_PORT=`; recreate an existing container to change its mapping. |
+| Settings appear unchanged | Recreate after environment changes; use `make refresh` for knowledge and instructions. |
+| Refresh starts a second runtime | `make refresh` starts missing containers. For one existing runtime, call `bash scripts/web-agent.sh refresh "$PWD"` or `bash scripts/opencode-web.sh refresh "$PWD"`. |
+| Chat space is cramped on mobile | Close the GitAgent **File System** inspector. |
+| OpenCode cannot see the agent | Add `/workspace` as the project, then refresh after source changes. |
+| `No module named yaml` | Install `PyYAML==6.0.3` in the Python environment used for host checks. |
+| `Unexpected GitAgent ...` adapter error | The adapter rejected unfamiliar runtime source. Check pinned versions and review the adapter before upgrading. |
 
-## Tradeoffs
+### Runtime compatibility and limits
 
-No Dockerfile or Compose required; the launcher uses `node:22-bookworm-slim`
-and installs dependencies on the first container startup. This is simple to demonstrate, but
-slower than a prebuilt image; transitive dependencies are not lockfile-pinned.
-The upstream UI may display voice-related labels even in text-only mode; this
-repo intentionally does not fork or patch that UI. The Responses, auth crypto,
-and text transport fixes above are compatibility exceptions, so the runtime is
-not entirely unmodified.
-Do not expose port 3333 publicly without HTTPS and stronger access controls.
-The launch script sources `.env` as Bash, so use ordinary shell-safe values.
+GitAgent **2.2.0** provides its browser UI through `@open-gitagent/voice`
+**1.0.0**. The `--voice gemini` flag selects its text-only fallback when no
+Gemini key is supplied; this launcher passes only the OpenAI key. Text model
+requests use OpenAI. Voice, messaging, and scheduling are outside this demo's scope.
+
+<details>
+<summary>Why the GitAgent runtime needs compatibility fixes</summary>
+
+[bin/configure-runtime.py](bin/configure-runtime.py) applies guarded changes
+inside the container:
+
+- Select OpenAI's Responses API for `gpt-6-luna`; other custom models keep their
+  existing API selection.
+- Replace two CommonJS crypto imports in the pinned ESM authentication server.
+- Send assistant text through the upstream transcript renderer so replies appear live.
+- Replace the voice warning with “Text chat ready”, serve HTTP 204 for the missing
+  favicon, and apply the upstream compact layout up to 900 px.
+- Infer HTTP transport for URL-only MCP server declarations.
+
+No frontend file is vendored or modified. Adaptations are specific to the pinned
+runtime and checked against expected source patterns.
+
+</details>
+
+Keep the demo on localhost. Public exposure needs HTTPS and stronger access
+controls; the default passwords are for local demonstrations only.
+
+## Development
+
+Offline checks require Bash, Make, **Python 3.12**, **Node.js 22**, and
+**PyYAML 6.0.3**. Install PyYAML in your active Python environment, then run:
+
+```sh
+python3 -m pip install PyYAML==6.0.3
+make lint test validate
+```
+
+[GitHub Actions](.github/workflows/checks.yml) runs the same command on PRs and
+`main`. It checks shell/JavaScript syntax, Python and Node regression tests,
+and the OKF bundle. Offline checks need no Docker or API credentials.
+
+After starting the relevant runtime, optional live checks consume model API tokens:
+
+| Command | Coverage |
+| --- | --- |
+| `make test-live` | GitAgent HTTP/WebSocket access, login when enabled, and a real response |
+| `make test-production-live` | Five-day totals, fictional-data warning, and canonical source citations |
+| `make test-gitagent-mcp-live` | Real Context7 resolve/query tool results through GitAgent |
+| `make test-mcp-live` | OpenCode MCP configuration, connected status, and real resolve/query calls |
+
+These live tests check runtime behavior and tool execution, not browser rendering.
+Check the UI separately when changing layout or transcript behavior.
+
+### Repository map
+
+| Path | Purpose |
+| --- | --- |
+| [agent.yaml](agent.yaml), [SOUL.md](SOUL.md), [RULES.md](RULES.md) | Agent model, identity, and behavior |
+| [knowledge/](knowledge/) | OKF navigation, concepts, and fictional sample data |
+| [skills/](skills/) | Knowledge-retrieval skill instructions |
+| [scripts/](scripts/) | Host-side Docker launchers |
+| [bin/](bin/) | OKF utility, runtime adapter, and OpenCode export helpers |
+| [tests/](tests/) | Offline regression suites and opt-in live checks |
+| [Makefile](Makefile) | Project commands |
+
+For help, [open an issue](https://github.com/tbrandenburg/gitagent-web-chat/issues).
+Include the command, runtime, and relevant logs with credentials removed.
+For contributions, keep changes focused, run offline checks, and describe
+validation in your pull request.
 
 ## License
 
-MIT — see [LICENSE](/LICENSE). Upstream dependencies retain their own licenses.
+MIT. See [LICENSE](LICENSE). Upstream dependencies retain their own licenses.
