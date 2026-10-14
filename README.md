@@ -1,7 +1,8 @@
 # Portable GitAgent web chat with OKF
 
 This directory **is the agent**, not a deployment wrapper. It includes `agent.yaml`,
-`SOUL.md`, `RULES.md`, `knowledge/` (OKF v0.2), `skills/`, and a Docker launcher.
+`SOUL.md`, `RULES.md`, `knowledge/` (OKF v0.2), and `skills/`. Host-side Docker
+launchers live in `scripts/`; `Makefile` provides the project commands.
 The configured text model is `openai:gpt-6-luna`.
 
 ## Scope
@@ -28,7 +29,9 @@ make logs
 ```
 
 Open http://localhost:3333. The initial startup installs runtime packages
-inside the container, so it can take a few minutes. `make down` removes the
+inside the container, so it can take a few minutes. `make up` shows elapsed-time
+progress and returns once the HTTP server responds; startup failures include
+recent container logs. `make down` removes the
 container, **not** the agent folder. `make validate` validates the OKF bundle.
 Sign in with **username `admin`, password `password`**. No `.env` is needed
 when `OPENAI_API_KEY` is exported in your shell.
@@ -40,7 +43,9 @@ Authentication is enabled by default with **demo-only credentials**. Override
 copied from `.env.example`. Set `GITAGENT_AUTH=false` to disable GitAgent login.
 Never expose the demo password publicly; change it before any non-local use.
 After changing environment settings, use `make down` then `make up` to recreate
-the container; `make up` reuses an existing container's configuration.
+the GitAgent container; `make up` reuses an existing container's configuration.
+For source or knowledge updates, `make refresh` updates both GitAgent and the
+copied OpenCode workspace in one command.
 The port is bound to `127.0.0.1`, not exposed on the network.
 GitAgent runs as your host UID/GID. Its automatic Git commits use separate,
 container-local metadata in `/runtime/git`, leaving the host repo's index and
@@ -133,7 +138,9 @@ username to `opencode`, not `admin`; the browser login asks only for a password.
 Override `OPENCODE_SERVER_PASSWORD` before any non-local use.
 
 This launcher installs pinned OpenGAP 0.5.0 and OpenCode CLI 2.0.28, then runs
-`opencode serve`. The source agent is mounted read-only and copied into a
+`opencode serve`. `make up-opencode` shows elapsed-time progress and returns
+once the HTTP server responds; startup failures include recent container logs.
+The source agent is mounted read-only and copied into a
 container-local workspace, excluding `.env`, Git metadata, runtime memory,
 dependencies, and browser artifacts. Source files remain untouched; OpenCode
 sessions and workspace edits survive a container restart but are lost when the
@@ -203,14 +210,17 @@ Sources: [OpenGAP 0.5.0 manifest schema](https://github.com/open-gitagent/openga
 
 ## How OKF is considered
 
-`knowledge/index.yaml` is GitAgent's native knowledge adapter, configured to
-always load `knowledge/index.md`. The rules tell the agent to navigate topic
+`knowledge/index.yaml` is GitAgent's native knowledge adapter: it always loads
+`knowledge/index.md` and explicitly lists topic indexes and concept documents
+available for on-demand reads. The rules tell the agent to navigate topic
 indexes and then read only relevant concept documents. This is *prompt-driven*
 retrieval, not a mandatory deterministic retrieval middleware.
 
-The OKF bundle also includes a clearly labeled synthetic production-line dataset
-under `knowledge/production/` for examples and regression tests; its invented
-values are not operational telemetry.
+The OKF bundle also includes a clearly labeled, fictional five-day production
+packet under `knowledge/production/`: shift output, quality categories, downtime
+categories, and metric definitions. Topic and concept indexes expose summaries
+before documents are read. Its invented values are not operational telemetry or
+suitable for production, quality-release, maintenance, or safety decisions.
 
 ## Tradeoffs
 

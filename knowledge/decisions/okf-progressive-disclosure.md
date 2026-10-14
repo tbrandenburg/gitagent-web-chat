@@ -15,9 +15,11 @@ sources:
 
 Store durable project knowledge under `/agent/knowledge` as an OKF v0.2
 bundle. The bundle root has an `index.md` and topic directories have their own
-`index.md` files. GitAgent's separate native `knowledge/index.yaml` declares
-**only the root `index.md`** `always_load: true`; this means individual
-concepts are not eagerly added to every model prompt.
+`index.md` files. GitAgent's separate native `knowledge/index.yaml` declares the
+root `index.md` with `always_load: true` and lists topic indexes and concepts as
+available on-demand documents. Individual concepts are not eagerly added to
+every model prompt, and files omitted from this adapter are not exposed in the
+loader's available-knowledge list.
 
 # Retrieval policy
 

@@ -18,7 +18,7 @@ class OpenCodeTests(unittest.TestCase):
         self.env = {'PATH': '/usr/local/bin:/usr/bin:/bin'}
 
     def launch(self, command='start'):
-        return subprocess.run(['bash', str(BASE / 'opencode-web.sh'), command,
+        return subprocess.run(['bash', str(BASE / 'scripts/opencode-web.sh'), command,
                                str(self.agent)], env=self.env,
                               capture_output=True, text=True, timeout=10)
 
@@ -65,4 +65,22 @@ class OpenCodeTests(unittest.TestCase):
                                         cwd=BASE, env=self.env, capture_output=True,
                                         text=True, timeout=10)
                 self.assertEqual(result.returncode, 0, result.stderr)
-                self.assertIn(f'./{script} start "{self.agent}"', result.stdout)
+                self.assertIn(f'./scripts/{script} start "{self.agent}"', result.stdout)
+
+    def test_refresh_target_validates_and_refreshes_both_runtimes(self):
+        result = subprocess.run(['make', '-n', 'refresh', f'AGENT_DIR={self.agent}'],
+                                cwd=BASE, env=self.env, capture_output=True,
+                                text=True, timeout=10)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('bin/okf', result.stdout)
+        self.assertIn('./scripts/web-agent.sh refresh', result.stdout)
+        self.assertIn('./scripts/opencode-web.sh refresh', result.stdout)
+
+    def test_opencode_refresh_reexports_copied_source_before_restart(self):
+        script = (BASE / 'scripts/opencode-web.sh').read_text()
+        refresh = script.split(' refresh)', 1)[1].split('\n    ;;', 1)[0]
+        self.assertLess(refresh.index('cp -a "/source-agent/$path"'),
+                        refresh.index('node /export-opencode.mjs /workspace'))
+        self.assertLess(refresh.index('node /export-opencode.mjs /workspace'),
+                        refresh.index('docker restart'))
+        self.assertIn('diff -qr /source-agent/knowledge /workspace/knowledge', refresh)

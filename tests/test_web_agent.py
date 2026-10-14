@@ -18,7 +18,7 @@ class LauncherTests(unittest.TestCase):
         self.env = {'PATH': '/usr/local/bin:/usr/bin:/bin'}
 
     def launch(self, command='start'):
-        return subprocess.run(['bash', str(BASE / 'web-agent.sh'), command,
+        return subprocess.run(['bash', str(BASE / 'scripts/web-agent.sh'), command,
                                str(self.agent)], env=self.env,
                               capture_output=True, text=True, timeout=10)
 
@@ -63,14 +63,14 @@ class LauncherTests(unittest.TestCase):
         manifest = yaml.safe_load((BASE / 'agent.yaml').read_text())
         self.assertEqual(manifest['model']['preferred'], 'openai:gpt-6-luna')
         self.assertEqual(manifest['model']['fallback'], [])
-        self.assertNotIn('--model', (BASE / 'web-agent.sh').read_text())
+        self.assertNotIn('--model', (BASE / 'scripts/web-agent.sh').read_text())
         self.assertIn('openai:gpt-6-luna', (BASE / 'README.md').read_text())
         self.assertIn('openai:gpt-6-luna',
                       (BASE / 'knowledge/operations/web-chat.md').read_text())
 
     def test_portable_agent_layout(self):
-        for name in ('agent.yaml', 'SOUL.md', 'RULES.md', 'Makefile',
-                     'web-agent.sh', 'skills/okf-knowledge/SKILL.md'):
+        for name in ('agent.yaml', 'SOUL.md', 'RULES.md',
+                     'skills/okf-knowledge/SKILL.md'):
             with self.subTest(name=name):
                 self.assertTrue((BASE / name).is_file())
                 self.assertGreater((BASE / name).stat().st_size, 0)
