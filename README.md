@@ -5,7 +5,8 @@
 
 **Run a portable, knowledge-aware agent in your browser.** This proof of concept
 packages a GitAgent agent, an Open Knowledge Format (OKF v0.2) knowledge base,
-and Docker launchers for two upstream chat interfaces. The configured model is
+and a portable [GitAgent management skill](skills/gitagent/SKILL.md) with Docker
+launchers for two upstream chat interfaces. The configured model is
 `openai:gpt-6-luna`.
 
 - **Try knowledge retrieval:** ask about fictional production data and trace
@@ -18,7 +19,7 @@ and Docker launchers for two upstream chat interfaces. The configured model is
 This is an experimental localhost demo with upstream interfaces and guarded
 runtime compatibility fixes. It does not include a custom chat server or UI.
 
-[Quick start](#quick-start) · [Commands](#commands) ·
+[Quick start](#quick-start) · [Skill usage and prompts](#use-the-management-skill-independently) · [Commands](#commands) ·
 [Configuration](#configuration) · [Knowledge](#knowledge-and-example-prompts) ·
 [OpenCode](#optional-opencode-v2) · [Troubleshooting](#troubleshooting) ·
 [Development](#development)
@@ -129,7 +130,7 @@ make logs AGENT_DIR=/absolute/path/to/other-agent
 make down AGENT_DIR=/absolute/path/to/other-agent
 ```
 
-The folder needs `agent.yaml`; helpers are mounted from this repo. The selected
+The folder needs `agent.yaml`; helpers are mounted from the management skill. The selected
 manifest supplies the model, and the folder's optional `.env` supplies its
 settings. Use distinct ports for simultaneous agents. `PORT=` overrides
 `CHAT_PORT`; `OPENCODE_PORT=` overrides the OpenCode environment setting.
@@ -138,10 +139,76 @@ To add OKF, copy `knowledge/` and `skills/okf-knowledge/`, then merge the
 knowledge rules from `RULES.md` into the other agent's rules. The launcher
 mounts the `okf` utility, so that folder does not need its own `bin/` directory.
 
+### Use the management skill independently
+
+Copy `skills/gitagent/` as a unit to your skill installation or another location.
+It contains the launchers, runtime adapters, export helpers, OKF utility, and
+tooling tests; it does not contain this agent's identity or knowledge. No global
+installation or agent scaffolding is performed. From any working directory:
+
+```sh
+SKILL_DIR=/absolute/path/to/gitagent
+AGENT_DIR=/absolute/path/to/agent
+make -f "$SKILL_DIR/Makefile" up AGENT_DIR="$AGENT_DIR" PORT=3334
+make -f "$SKILL_DIR/Makefile" lint test
+```
+
+Tool paths are resolved from the skill Makefile. The agent defaults to the caller's
+working directory; pass an absolute `AGENT_DIR` when using `make -C`. The root
+Makefile preserves this project's short commands by delegating runtime operations
+to the skill. Keep agent-specific tests outside the skill.
+See [runtime management](skills/gitagent/references/runtime-management.md) for
+execution boundaries, configuration, dependencies, and troubleshooting.
+
+#### Ask your assistant to use the skill
+
+Use a skill-capable coding assistant running **on the Docker host**, with shell
+and Docker access. Make the `gitagent` skill available through your assistant's
+supported skill-loading mechanism. If it does not discover the skill, explicitly
+point it at the instructions; from this repository, start with:
+
+```text
+Read skills/gitagent/SKILL.md and use that skill to launch the existing agent
+in this repository with GitAgent browser chat on localhost port 3334.
+Use the inherited OPENAI_API_KEY without displaying it. Preserve the agent's
+manifest, identity, rules, knowledge, and domain skills. Do not remove any
+existing containers. Report the URL when startup succeeds.
+```
+
+The skill manages an **existing** agent containing `agent.yaml`; it does not
+create a new agent or its core files. For an independently installed copy,
+replace `skills/gitagent/SKILL.md` with its actual path. Replace the example
+agent paths below with your own.
+
+| Goal | Example prompt |
+| --- | --- |
+| Launch GitAgent | “Use the gitagent skill to start the existing agent at `/path/to/my-agent` with GitAgent browser chat on localhost port 3334. Do not replace its core files or remove existing containers. Report the URL.” |
+| Launch OpenCode V2 | “Use the gitagent skill to start `/path/to/my-agent` with the OpenCode V2 runtime on localhost port 4097. Report the URL and which project directory to select.” |
+| Inspect without changing state | “Use the gitagent skill to inspect the GitAgent and OpenCode container status for `/path/to/my-agent`. Do not start, restart, or remove containers, and do not display credentials.” |
+| Refresh one runtime | “Use the gitagent skill to refresh only GitAgent for `/path/to/my-agent` after my knowledge edits. If its container is missing, report that instead of starting it. Leave OpenCode untouched.” |
+| Inspect knowledge offline | “Use the gitagent skill's OKF utility to validate `/path/to/my-agent/knowledge` and search for `synthetic production shift`. Do not start containers or make model calls.” |
+| Check the portable tooling | “Use the gitagent skill to run its offline lint and tooling tests. Report failures without launching an agent or changing its files.” |
+| Test real chat and MCP | “Use the gitagent skill to test a real text response and Context7 tool calls through the running GitAgent container for `/path/to/my-agent`. Model API token usage is permitted. Do not test another agent.” |
+| Remove a selected container | “Use the gitagent skill to remove only the GitAgent chat container for `/path/to/my-agent`. I accept losing its container-local runtime history. Preserve host agent files and leave OpenCode and unrelated containers untouched.” |
+
+Supply model credentials through the host environment or the selected agent's
+trusted `.env`, not in the prompt. Startup requires the
+[prerequisites](#prerequisites); live checks consume model API tokens, and MCP
+checks require the configured Context7 endpoint. The generic `refresh` Make
+target refreshes **both** runtimes and starts missing containers, so explicitly
+request a single-runtime operation when that is what you intend.
+
+These prompts are for the **host-side assistant managing the runtime**. They
+are not chat slash commands or SkillsFlow `@` invocations. Inside the launched
+chat, use [knowledge questions](#knowledge-and-example-prompts) or the
+[`@echo-chain` demo](#skillsflow-echo-demo-gitagent-only); do not ask that container
+to restart or remove itself.
+
 ## Configuration
 
 An exported `OPENAI_API_KEY` is enough to start. For local overrides, copy
-[.env.example](.env.example) to `.env` in the selected agent folder and edit it.
+[the environment template](skills/gitagent/assets/.env.example) to `.env` in the
+selected agent folder if it does not exist, then edit it.
 The launchers source `.env` as Bash; use trusted files and shell-safe values.
 Local values override inherited environment values, while explicit Make port
 overrides take precedence over both.
@@ -161,6 +228,15 @@ Change the preferred model in [agent.yaml](agent.yaml). After environment
 changes, remove and recreate the affected container with `make down` /
 `make up` or `make down-opencode` / `make up-opencode`. Starting an existing
 container reuses its original environment and port mapping.
+
+### Migrating containers created before the skill relocation
+
+Existing containers retain mounts pointing at the former root `bin/` and `tests/`
+paths. Refresh does not update those mounts, and an old OpenCode workspace can
+retain stale root tooling. Save OpenCode workspace edits and needed runtime history
+first, then deliberately recreate the affected container using `make down` /
+`make up` or `make down-opencode` / `make up-opencode`. Removal discards container
+sessions and workspace data; the relocation does not remove containers automatically.
 
 ### What persists?
 
@@ -205,7 +281,7 @@ Inspect knowledge without a model call:
 ```sh
 make validate
 make search QUERY="synthetic production shift"
-python3 bin/okf --root knowledge read production/shift-production-register.md
+python3 skills/gitagent/bin/okf --root knowledge read production/shift-production-register.md
 ```
 
 ## Optional OpenCode V2
@@ -228,7 +304,7 @@ make up-opencode AGENT_DIR=/absolute/path/to/other-agent OPENCODE_PORT=4097
 
 The launcher installs OpenGAP **0.5.0** and OpenCode CLI **2.0.28**. Its initial
 copy excludes `.env` files, Git metadata, runtime memory, dependencies, and
-browser artifacts. [bin/export-opencode.mjs](bin/export-opencode.mjs) exports
+browser artifacts. [The exporter](skills/gitagent/bin/export-opencode.mjs) exports
 identity, rules, skills, the OKF root map, and native V2 model/MCP configuration.
 It selects the Responses API for `gpt-6-luna`. GitAgent hooks, custom tools,
 and compliance enforcement are not fully translated.
@@ -280,7 +356,7 @@ References: [OpenGAP schema](https://github.com/open-gitagent/opengap/blob/v0.5.
 | Startup waits or fails | Read the launcher's recent logs, then use `make logs` or `make logs-opencode`. First startup downloads packages. |
 | Port already in use | Choose another `PORT=` or `OPENCODE_PORT=`; recreate an existing container to change its mapping. |
 | Settings appear unchanged | Recreate after environment changes; use `make refresh` for knowledge and instructions. |
-| Refresh starts a second runtime | `make refresh` starts missing containers. For one existing runtime, call `bash scripts/web-agent.sh refresh "$PWD"` or `bash scripts/opencode-web.sh refresh "$PWD"`. |
+| Refresh starts a second runtime | `make refresh` starts missing containers. For one existing runtime, call `bash skills/gitagent/scripts/web-agent.sh refresh "$PWD"` or `bash skills/gitagent/scripts/opencode-web.sh refresh "$PWD"`. |
 | Chat space is cramped on mobile | Close the GitAgent **File System** inspector. |
 | OpenCode cannot see the agent | Add `/workspace` as the project, then refresh after source changes. |
 | `No module named yaml` | Install `PyYAML==6.0.3` in the Python environment used for host checks. |
@@ -296,7 +372,7 @@ requests use OpenAI. Voice, messaging, and scheduling are outside this demo's sc
 <details>
 <summary>Why the GitAgent runtime needs compatibility fixes</summary>
 
-[bin/configure-runtime.py](bin/configure-runtime.py) applies guarded changes
+[The runtime adapter](skills/gitagent/bin/configure-runtime.py) applies guarded changes
 inside the container:
 
 - Select OpenAI's Responses API for `gpt-6-luna`; other custom models keep their
@@ -329,6 +405,16 @@ make lint test validate
 `main`. It checks shell/JavaScript syntax, Python and Node regression tests,
 and the OKF bundle. Offline checks need no Docker or API credentials.
 
+`make test-tooling` runs the skill's Python and Node suites with temporary,
+agent-independent fixtures. `make test-agent` checks this agent's manifest,
+knowledge, and echo flow. `make test` runs both. Portability tests execute a
+copied skill from paths containing spaces against an unrelated minimal agent.
+The production live scenario stays in [tests/live-production.mjs](tests/live-production.mjs)
+and plugs into the skill's shared live-chat harness rather than being packaged
+as generic runtime behavior. The management skill is visible alongside domain
+skills when exporting an agent; its host-only lifecycle instructions do not
+grant Docker access inside the container.
+
 After starting the relevant runtime, optional live checks consume model API tokens:
 
 | Command | Coverage |
@@ -347,11 +433,11 @@ Check the UI separately when changing layout or transcript behavior.
 | --- | --- |
 | [agent.yaml](agent.yaml), [SOUL.md](SOUL.md), [RULES.md](RULES.md) | Agent model, identity, and behavior |
 | [knowledge/](knowledge/) | OKF navigation, concepts, and fictional sample data |
-| [skills/](skills/) | Knowledge-retrieval skill instructions |
-| [scripts/](scripts/) | Host-side Docker launchers |
-| [bin/](bin/) | OKF utility, runtime adapter, and OpenCode export helpers |
-| [tests/](tests/) | Offline regression suites and opt-in live checks |
-| [Makefile](Makefile) | Project commands |
+| [skills/gitagent/](skills/gitagent/) | Portable runtime-management skill: launchers, helpers, tooling tests, environment template |
+| [skills/okf-knowledge/](skills/okf-knowledge/), `skills/echo-*/` | Agent-owned retrieval and demonstration skills |
+| [workflows/](workflows/) | Agent-owned SkillsFlow definitions |
+| [tests/](tests/) | Agent content/workflow regression tests and production live scenario |
+| [Makefile](Makefile) | Thin runtime delegation and agent-specific checks |
 
 For help, [open an issue](https://github.com/tbrandenburg/gitagent-web-chat/issues).
 Include the command, runtime, and relevant logs with credentials removed.

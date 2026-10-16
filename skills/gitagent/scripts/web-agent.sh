@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 # Can be called from ANY GitAgent-compatible folder:
-#   /path/to/scripts/web-agent.sh start /path/to/my-agent
+#   /path/to/gitagent/scripts/web-agent.sh start /path/to/my-agent
 COMMAND="${1:-start}"
 AGENT_DIR="${2:-$PWD}"
 AGENT_DIR="$(cd "$AGENT_DIR" && pwd)"
@@ -123,12 +123,8 @@ case "$COMMAND" in
  status) docker ps -a --filter "name=^/${NAME}$" ;;
  shell) docker exec -it "$NAME" bash ;;
  test)
-   docker exec -e LIVE_CHAT_SCENARIO="${LIVE_CHAT_SCENARIO:-smoke}" "$NAME" sh -c '
-     if [ -f /launcher-tests/live-chat.mjs ]; then
-       exec node /launcher-tests/live-chat.mjs
-     fi
-     exec node /agent/tests/live-chat.mjs
-   '
+    docker exec -e LIVE_CHAT_SCENARIO="${LIVE_CHAT_SCENARIO:-smoke}" \
+      -e LIVE_CHAT_CASE="${LIVE_CHAT_CASE:-}" "$NAME" node /launcher-tests/live-chat.mjs
    ;;
  *) echo "Usage: $0 {start|stop|refresh|logs|status|shell|test} [agent-folder]" >&2; exit 2 ;;
 esac

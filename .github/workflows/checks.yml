@@ -21,4 +21,5 @@ jobs:
         with:
           node-version: '22'
       - run: python -m pip install PyYAML==6.0.3
-      - run: make lint test validate
+      - name: Check portable tooling and agent content
+        run: make lint test-tooling test-agent validate
