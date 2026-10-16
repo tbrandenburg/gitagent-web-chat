@@ -1,12 +1,15 @@
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
+import { pathToFileURL } from 'node:url';
 
 const require = createRequire('/usr/local/lib/node_modules/@open-gitagent/voice/package.json');
 const WebSocket = require('ws');
 const base = 'http://127.0.0.1:3333';
 const password = process.env.GITAGENT_PASSWORD ?? '';
-const production = process.env.LIVE_CHAT_SCENARIO === 'production';
 const mcp = process.env.LIVE_CHAT_SCENARIO === 'mcp';
+const scenario = process.env.LIVE_CHAT_CASE
+  ? await import(pathToFileURL(process.env.LIVE_CHAT_CASE).href)
+  : undefined;
 if (mcp) assert.equal(process.env.CONTEXT7_API_KEY, undefined);
 const headers = {};
 const health = await fetch(`${base}/health`, { signal: AbortSignal.timeout(10000) });
@@ -50,8 +53,8 @@ await new Promise((resolve, reject) => {
     if (message.type === 'transcript' && (message.text === 'Text chat ready.' || message.text.includes('Voice mode unavailable'))) {
       socket.send(JSON.stringify({
         type: 'text',
-        text: production
-          ? 'For the general five-day production sample, follow the production topic index and use its canonical overview and shift register, not the compact two-shift regression example. Report total produced, good, rejected, and downtime across all ten shifts, and name the register and overview source paths. Explain whether these are real measurements or suitable for safety decisions. Do not change files or memory.'
+        text: scenario
+          ? scenario.prompt
           : mcp
             ? 'Use Context7 MCP to resolve the React library ID and then query its useEffect cleanup documentation. You must call both tools in this request, not reuse past results. Do not substitute shell, web search, or remembered documentation. Explain cleanup on dependency changes and unmount and cite the returned library ID. Do not change files or memory.'
             : 'Reply with exactly: LUNA_CHAT_OK. Do not use tools, write files, or update memory.',
@@ -63,15 +66,8 @@ await new Promise((resolve, reject) => {
     if (message.type === 'tool_result') results.push(message);
     if (message.type === 'agent_done') {
       try {
-        if (production) {
-          for (const value of [/79,?860/, /78,?456/, /1,?404/, /257/]) {
-            assert.match(message.result, value);
-          }
-          assert.match(message.result, /fabricated|fictional|synthetic/i);
-          assert.match(message.result, /(?:not|unsuitable)[^\n]{0,140}safety/i);
-          assert.match(message.result, /knowledge\/production\/shift-production-register\.md/);
-          assert.match(message.result, /knowledge\/production\/production-data-overview\.md/);
-          assert.doesNotMatch(message.result, /knowledge\/production\/production-line-example\.md/);
+        if (scenario) {
+          scenario.validate(message.result);
         } else if (mcp) {
           for (const name of ['resolve-library-id', 'query-docs']) {
             const result = results.find((value) => value.toolName === `context7__${name}`);

@@ -4,8 +4,6 @@ import subprocess
 import tempfile
 import unittest
 
-import yaml
-
 BASE = Path(__file__).resolve().parents[1]
 
 
@@ -26,6 +24,11 @@ class LauncherTests(unittest.TestCase):
         result = self.launch()
         self.assertNotEqual(result.returncode, 0)
         self.assertIn('Set OPENAI_API_KEY', result.stderr)
+
+    def test_model_selection_is_delegated_to_agent_manifest(self):
+        script = (BASE / 'scripts/web-agent.sh').read_text()
+        self.assertNotIn('--model', script)
+        self.assertIn('gitagent --voice gemini --dir /agent', script)
 
     def test_auth_requires_password_when_enabled(self):
         self.env.update(OPENAI_API_KEY='synthetic-key', GITAGENT_AUTH='true',
@@ -58,24 +61,6 @@ class LauncherTests(unittest.TestCase):
         self.assertEqual(result.returncode, 2)
         self.assertIn('Usage:', result.stderr)
         self.assertNotIn('Set OPENAI_API_KEY', result.stderr)
-
-    def test_model_is_consistent_in_manifest_launcher_and_docs(self):
-        manifest = yaml.safe_load((BASE / 'agent.yaml').read_text())
-        self.assertEqual(manifest['model']['preferred'], 'openai:gpt-6-luna')
-        self.assertEqual(manifest['model']['fallback'], [])
-        self.assertNotIn('--model', (BASE / 'scripts/web-agent.sh').read_text())
-        self.assertIn('openai:gpt-6-luna', (BASE / 'README.md').read_text())
-        self.assertIn('openai:gpt-6-luna',
-                      (BASE / 'knowledge/operations/web-chat.md').read_text())
-
-    def test_portable_agent_layout(self):
-        for name in ('agent.yaml', 'SOUL.md', 'RULES.md',
-                     'skills/okf-knowledge/SKILL.md'):
-            with self.subTest(name=name):
-                self.assertTrue((BASE / name).is_file())
-                self.assertGreater((BASE / name).stat().st_size, 0)
-        self.assertIn('knowledge/', (BASE / 'RULES.md').read_text())
-        self.assertFalse((BASE / 'bootstrap').exists())
 
     def test_invalid_port_is_rejected(self):
         self.env.update(OPENAI_API_KEY='synthetic-key', CHAT_PORT_OVERRIDE='70000')

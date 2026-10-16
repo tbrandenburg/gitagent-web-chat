@@ -4,8 +4,6 @@ import subprocess
 import tempfile
 import unittest
 
-import yaml
-
 BASE = Path(__file__).resolve().parents[1]
 
 
@@ -34,17 +32,11 @@ class OpenCodeTests(unittest.TestCase):
         self.assertIn('Set OPENAI_API_KEY', result.stderr)
 
     def test_demo_defaults_are_documented(self):
-        example = (BASE / '.env.example').read_text()
+        example = (BASE / 'assets/.env.example').read_text()
         self.assertIn('GITAGENT_USERNAME=admin', example)
         self.assertIn('GITAGENT_PASSWORD=password', example)
         self.assertIn('OPENCODE_SERVER_PASSWORD=password', example)
         self.assertIn('fixed username opencode', example)
-
-    def test_manifest_declares_context7_without_credentials(self):
-        manifest = yaml.safe_load((BASE / 'agent.yaml').read_text())
-        server = manifest['mcp_servers']['context7']
-        self.assertEqual(server, {'url': 'https://mcp.context7.com/mcp'})
-        self.assertNotIn('headers', server)
 
     def test_port_override_beats_agent_env(self):
         (self.agent / '.env').write_text('OPENCODE_PORT=4096\n')
@@ -61,20 +53,22 @@ class OpenCodeTests(unittest.TestCase):
     def test_make_targets_pass_agent_directory_with_spaces(self):
         for target, script in [('up', 'web-agent.sh'), ('up-opencode', 'opencode-web.sh')]:
             with self.subTest(target=target):
-                result = subprocess.run(['make', '-n', target, f'AGENT_DIR={self.agent}'],
+                result = subprocess.run(['make', '-f', str(BASE / 'Makefile'), '-n',
+                                         target, f'AGENT_DIR={self.agent}'],
                                         cwd=BASE, env=self.env, capture_output=True,
                                         text=True, timeout=10)
                 self.assertEqual(result.returncode, 0, result.stderr)
-                self.assertIn(f'./scripts/{script} start "{self.agent}"', result.stdout)
+                self.assertIn(f'"{BASE}/scripts/{script}" start "{self.agent}"', result.stdout)
 
     def test_refresh_target_validates_and_refreshes_both_runtimes(self):
-        result = subprocess.run(['make', '-n', 'refresh', f'AGENT_DIR={self.agent}'],
+        result = subprocess.run(['make', '-f', str(BASE / 'Makefile'), '-n',
+                                 'refresh', f'AGENT_DIR={self.agent}'],
                                 cwd=BASE, env=self.env, capture_output=True,
                                 text=True, timeout=10)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn('bin/okf', result.stdout)
-        self.assertIn('./scripts/web-agent.sh refresh', result.stdout)
-        self.assertIn('./scripts/opencode-web.sh refresh', result.stdout)
+        self.assertIn('scripts/web-agent.sh" refresh', result.stdout)
+        self.assertIn('scripts/opencode-web.sh" refresh', result.stdout)
 
     def test_opencode_refresh_reexports_copied_source_before_restart(self):
         script = (BASE / 'scripts/opencode-web.sh').read_text()

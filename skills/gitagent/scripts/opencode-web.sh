@@ -124,12 +124,7 @@ case "$COMMAND" in
  status) docker ps -a --filter "name=^/${NAME}$" ;;
  shell) docker exec -it "$NAME" bash ;;
  test-mcp)
-   docker exec -w /workspace "$NAME" sh -c '
-      if [ -f /launcher-tests/live-opencode-mcp.mjs ]; then
-        exec node /launcher-tests/live-opencode-mcp.mjs
-      fi
-      exec node /source-agent/tests/live-opencode-mcp.mjs
-    '
+    docker exec -w /workspace "$NAME" node /launcher-tests/live-opencode-mcp.mjs
    ;;
   *) echo "Usage: $0 {start|stop|refresh|logs|status|shell|test-mcp} [agent-folder]" >&2; exit 2 ;;
 esac

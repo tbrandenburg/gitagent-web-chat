@@ -28,6 +28,9 @@ for `gpt-6-luna`, which supports the agent's function tools with reasoning.
 # Operations
 
 - Run `make up` from the agent directory; `make down` removes the container.
+- Runtime tooling lives in `skills/gitagent/`. The root Makefile delegates to
+  that skill; for an independent copy use `make -f "$SKILL_DIR/Makefile" up
+  AGENT_DIR="$AGENT_DIR"` on the Docker host, not inside a chat container.
 - Use `make up AGENT_DIR=/path/to/agent PORT=3334` for another agent. No launcher
   or compatibility helper is required inside the selected agent folder.
 - Browser URL: `http://localhost:${CHAT_PORT:-3333}` on the Docker host.
@@ -36,10 +39,13 @@ for `gpt-6-luna`, which supports the agent's function tools with reasoning.
 - Demo login defaults to `admin` / `password`. Override `GITAGENT_PASSWORD` or
   set `GITAGENT_AUTH=false`, then recreate the container.
 - The port is bound to localhost; never expose the demo credentials publicly.
-- To inspect a running container: `make shell`, then `python3 bin/okf index`.
+- To inspect a running container: `make shell`, then `okf index`.
 - Verify a real text response with `make test-live` (consumes API tokens).
 - Automatic Git commits use container-local metadata; the host Git index and
   history are not used. Recreating the container discards runtime chat branches.
+- Containers created before the tooling relocation retain old helper mounts.
+  Save needed sessions/workspace changes before deliberately removing and
+  recreating them; refresh cannot change existing mount configuration.
 
 ## Alternative upstream frontend
 
