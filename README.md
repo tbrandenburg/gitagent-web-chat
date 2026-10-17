@@ -432,6 +432,11 @@ linked; no autobuilds or model credentials were enabled. This is not completion
 of issue #13: real answers, model-mediated denial, conversation survival and
 owner signoff remain unverified.
 
+Real Chromium password entry, incorrect-password rejection, project selection,
+empty-session UI, reload/new tab and a 45-second idle reconnect were exercised.
+**Browser reliability is still blocked:** repeated runs exposed intermittent API
+503s and a folder-picker failure; later successful attempts do not resolve them.
+
 The [preview staging helper](/skills/gitagent/scripts/prepare-opencode-preview.py)
 copies tracked curated inputs outside the repository and generates root Docker
 build artifacts from the existing pinned image source. Runtime/archive memory,

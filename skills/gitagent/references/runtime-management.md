@@ -402,8 +402,8 @@ After the upload and credential-transport safety fixes, the coordinator prepared
 on 2026-10-17. The existing automation bypass was reused, not generated or rotated;
 a new strong sensitive Preview password was passed in memory and not retained.
 
-Final evidence: [protected Preview](https://gitagent-opencode-issue13-59ocu6qvn-tom-brandenburgs-projects.vercel.app),
-deployment `dpl_3vmGhj76wTtBg2Ee6S6W1zqejwEq`, `READY`, `plan: hobby`, Preview.
+Latest evidence: [protected Preview](https://gitagent-opencode-issue13-kvyg7yhiy-tom-brandenburgs-projects.vercel.app),
+deployment `dpl_97BS1b9hKqVLNGSXvPQumLTYjf6G`, `READY`, `plan: hobby`, Preview.
 Signed-out UI, **real bundled asset**, API, SSE and PTY path returned Vercel 302
 challenges. Authorized UI/assets returned 200; API without runtime Basic auth
 returned 401 and correct auth returned 200. Generated `/tmp/workspace/opencode.json`,
@@ -414,20 +414,50 @@ probe without waiting saw no custom agents; first HTTP readiness is insufficient
 Private file-based curl configuration succeeded where stdin-based auth failed.
 Fresh local no-model Docker probes also passed with ports 8080 and 80, restart
 and temporary-marker loss. Existing local containers were preserved.
-After the coordinator's final build, read-only registry inspection returned five ready images totalling
-2,520,489,775 manifest-reported bytes, plus the empty repository from the failed
+After browser QA, read-only registry inspection returned six ready images totalling
+3,024,588,461 manifest-reported bytes, plus the empty repository from the failed
 nested-context attempt. This sum is not deduplicated billed GB-months or a
 team-wide remaining-quota measurement. The generated password was deliberately
 not disclosed; the owner should set their own strong sensitive Preview password
 and redeploy before browser password-entry/manual signoff.
 
+### Real Chromium browser QA
+
+The coordinator exercised the actual upstream UI using Playwright/Chromium,
+not injected Basic-auth headers or mocked responses. A fresh signed-out browser
+reached Vercel's login page. An isolated authorized context supplied the existing
+automation bypass only to the exact Preview origin; actual Vercel account/OAuth
+sign-in was not performed. OpenCode's **Use password** form rejected an incorrect
+password with 401, then accepted the strong password entered through that form.
+Selecting `/tmp/workspace`, opening the empty-session composer, reload and a
+second browser tab worked. After closing the tabs for 45 seconds, the project
+UI reconnected and completed loading. No prompt or model call was submitted;
+these checks do not prove conversation survival or instance replacement.
+
+**Browser reliability remains BROKEN:** repeat runs exposed intermittent 503
+responses for `/api/command`, `/api/skill` and `/api/integration`, confirmed in
+Vercel request logs. The UI displayed `Request failed / UnexpectedStatus: 503`;
+one folder-picker attempt displayed `Unable to read this folder`. Later attempts
+loaded successfully, which does not resolve the intermittent failure. Runtime
+logs also recorded exit 130/SIGINT, but causation is unproven. Zero JavaScript
+page errors were observed; the wrong-password 401s were expected. Aborted
+worktree-refresh requests occurred during navigation. Preserve this as a release
+blocker, not a passing cloud-reliability claim.
+
+The browser harness ran as `node /tmp/opencode/issue13-browser-acceptance.mjs`,
+with test credentials piped privately on stdin and no trace/HAR recording.
+Screenshots were inspected under ignored `.playwright-mcp/issue13-*.png`;
+the private temporary credential file was removed afterward. The checked-in
+no-inference HTTP smoke was rerun successfully against this deployment.
+
 ### Limits, rollback and research-only alternatives
 
 Workspace edits, runtime Git, XDG/SQLite and conversations remain temporary.
 Preview idle scale-down is documented after 30 seconds; usable conversation
-survival, reload/new-tab/cold-start/concurrent behavior, peak memory, signal
-handling, browser password-entry UI and PTY transport were **not verified** by
-these HTTP probes. No genuine answer, production-data reasoning, model-mediated
+survival, confirmed cold-start/load behavior, peak memory, signal handling and
+PTY transport remain unverified. Browser reload/new-tab and 45-second idle
+reconnection observations above are not durability guarantees. No genuine
+answer, production-data reasoning, model-mediated
 permission denial, MCP/subagent execution or owner signoff is claimed. Model
 inference remains separately billable and unauthorized here.
 
