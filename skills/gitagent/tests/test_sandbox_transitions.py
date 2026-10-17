@@ -1,4 +1,5 @@
 import copy
+import json
 import os
 import subprocess
 import unittest
@@ -13,6 +14,31 @@ controller = contracts.controller
 
 class TransitionTests(unittest.TestCase):
     args = contracts.ControllerTests.args
+
+    def test_platform_stop_sends_empty_json_stdin_to_select_cli_content_type(self):
+        with patch.dict(os.environ, {'PATH': '/synthetic/bin', 'HOME': '/synthetic'}, clear=True):
+            transport = contracts.API('hobby')
+            class JsonStopAPI(LifecycleAPI):
+                def call(self, path, method='GET', body=None, **options):
+                    response = super().call(path, method, body, **options)
+                    if method == 'POST' and path.endswith('/stop'):
+                        return transport.call(path, method, body, **options)
+                    return response
+            def run(command, **options):
+                self.assertEqual(command[2], '/v2/sandboxes/sessions/session_fixture/stop')
+                self.assertEqual(command[command.index('--method') + 1], 'POST')
+                # CLI JSON stdin selects application/json even when the endpoint has no fields.
+                self.assertIn('--input', command)
+                self.assertEqual(command[command.index('--input') + 1], '-')
+                self.assertEqual(options['input'], '{}')
+                self.assertEqual(json.loads(options['input']), {})
+                self.assertEqual(options['env'], {'PATH': '/synthetic/bin', 'HOME': '/synthetic'})
+                return subprocess.CompletedProcess(command, 0, '{"session":{}}')
+            api = JsonStopAPI(contracts.fixture('running'))
+            with patch('sandbox_api.subprocess.run', side_effect=run) as launch:
+                result = controller.operate(self.args('stop'), api)
+        self.assertEqual(launch.call_count, 1)
+        self.assertEqual(result, {'status': 'stopped', 'sessionStatus': 'stopped'})
 
     def test_pending_session_must_be_running_before_any_credential_command(self):
         class PendingAPI(LifecycleAPI):

@@ -11,6 +11,7 @@ import urllib.parse
 
 from sandbox_api import API
 from sandbox_lifecycle import BIN, MANAGED, check, report, stop, wait_for
+from sandbox_network import desired_policy, ensure_policy, saved_policy, verify_policy
 
 
 def verify_gateway(url: str) -> None:
@@ -60,10 +61,11 @@ def operate(args: argparse.Namespace, api: API) -> dict:
     if args.with_model and (box['status'] != 'stopped' or box['tags'].get('protection') != 'verified'):
         raise ValueError('Model-enabled resume requires stopped, previously protection-verified Sandbox')
     launching = not exists or box['status'] == 'stopped'
+    requested = desired_policy(args.with_model)
     if box['status'] == 'stopped' and data['session']['status'] == 'stopped':
         if not box.get('currentSnapshotId'):
             raise ValueError('Retained snapshot absent; refusing implicit reset')
-        api.call(path, 'PATCH', {'ports': [], 'env': {}})
+        api.call(path, 'PATCH', {'ports': [], 'env': {}, 'networkPolicy': requested})
         data = api.call(path + '&resume=true')
         box = check(data, project, args.name, args.image)
     data = wait_for(api, path, data, identity, 'running')
@@ -72,9 +74,10 @@ def operate(args: argparse.Namespace, api: API) -> dict:
     environment = {'OPENCODE_SERVER_PASSWORD': password}
     launched = None
     try:
+        policy = requested if launching else saved_policy(box.get('networkPolicy'))
+        data = ensure_policy(api, path, data, identity, policy, update=launching)
+        box = data['sandbox']
         if launching:
-            policy = {'mode': 'custom', 'allowedDomains': ['api.openai.com', 'mcp.context7.com']} if args.with_model else {'mode': 'deny-all'}
-            api.call(path, 'PATCH', {'networkPolicy': policy})
             runtime = {**environment, **({'OPENAI_API_KEY': os.environ['OPENAI_API_KEY']} if args.with_model else {})}
             launched = api.command(box['currentSessionId'], 'bash', [BIN + '/scripts/sandbox-start.sh'], runtime, wait=False)
         api.command(box['currentSessionId'], 'python3', [BIN + '/bin/sandbox-check.py'], environment)
@@ -88,6 +91,7 @@ def operate(args: argparse.Namespace, api: API) -> dict:
         box = check(data, *identity, session=session)
         if box['status'] != 'running' or data['session']['status'] != 'running':
             raise RuntimeError('Published session is no longer running')
+        verify_policy(data, policy)
         routes = [route for route in data['routes'] if not route.get('system')]
         if len(routes) != 1 or routes[0]['port'] != 8080:
             raise ValueError('Unexpected gateway routes')

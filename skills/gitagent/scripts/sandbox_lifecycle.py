@@ -95,7 +95,7 @@ def stop(api: API, path: str, data: dict, identity: tuple[str, str, str]) -> dic
         except Exception:
             # Even malformed PID state or a timed-out helper must not block VM resource release.
             failed = True
-    api.call('/v2/sandboxes/sessions/' + session + '/stop', 'POST')
+    api.call('/v2/sandboxes/sessions/' + session + '/stop', 'POST', {})
     fresh = api.call(path, timeout=30)
     check(fresh, *identity, session=session)
     stopped = wait_for(api, path, fresh, identity, 'stopped')

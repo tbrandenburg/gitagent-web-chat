@@ -25,7 +25,9 @@ def fixture(status: str = 'stopped') -> dict:
         'persistent': True, 'status': status, 'vcpus': 1, 'memory': 2048, 'timeout': 2_700_000,
         'snapshotExpiration': 0, 'keepLastSnapshots': {'count': 1, 'expiration': 0, 'deleteEvicted': True},
         'currentSessionId': 'session_fixture', 'currentSnapshotId': 'snapshot_fixture',
-    }, 'session': {'id': 'session_fixture', 'projectId': 'prj_fixture', 'sourceSandboxName': 'retained', 'status': status}, 'routes': []}
+        'networkPolicy': {'mode': 'deny-all'},
+    }, 'session': {'id': 'session_fixture', 'projectId': 'prj_fixture', 'sourceSandboxName': 'retained',
+                   'status': status, 'networkPolicy': {'mode': 'deny-all'}}, 'routes': []}
 
 
 class FakeAPI:

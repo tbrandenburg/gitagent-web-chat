@@ -1,3 +1,4 @@
+import copy
 import os
 import unittest
 from unittest.mock import patch
@@ -23,11 +24,16 @@ class LifecycleAPI(FakeAPI):
         if 'resume=true' in path:
             self.data['sandbox']['status'] = 'running'
             self.data['session']['status'] = 'running'
+            self.data['session']['networkPolicy'] = copy.deepcopy(self.data['sandbox']['networkPolicy'])
+        if path.endswith('/network-policy') and method == 'POST':
+            self.data['session']['networkPolicy'] = copy.deepcopy(body)
         if path.endswith('/stop') and method == 'POST':
             self.data['sandbox']['status'] = 'stopped'
             self.data['session']['status'] = 'stopped'
         if method == 'PATCH' and body and 'ports' in body:
             self.data['routes'] = [{'port': port, 'url': 'https://verified-origin.vercel.run'} for port in body['ports']]
+        if method == 'PATCH' and body and 'networkPolicy' in body:
+            self.data['sandbox']['networkPolicy'] = copy.deepcopy(body['networkPolicy'])
         return self.data
 
 
@@ -45,7 +51,8 @@ class LifecycleTests(unittest.TestCase):
         self.assertEqual(commands[0][4], {'OPENCODE_SERVER_PASSWORD': 's' * 40})
         self.assertFalse(commands[0][5])
         self.assertTrue(commands[1][5])
-        private = next(index for index, call in enumerate(api.calls) if len(call) == 3 and call[2] == {'ports': [], 'env': {}})
+        private = next(index for index, call in enumerate(api.calls) if len(call) == 3
+                       and call[2] == {'ports': [], 'env': {}, 'networkPolicy': {'mode': 'deny-all'}})
         launched = api.calls.index(commands[0])
         checked = api.calls.index(commands[1])
         published = next(index for index, call in enumerate(api.calls) if len(call) == 3 and call[2] == {'ports': [8080]})
