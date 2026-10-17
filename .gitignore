@@ -2,6 +2,7 @@
 .env.*
 !.env.example
 .gitagent/
+.vercel/
 workspace/
 memory/runtime/
 memory/archive/
