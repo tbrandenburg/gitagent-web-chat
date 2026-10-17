@@ -52,6 +52,10 @@ Copy `assets/.env.example` to the selected agent's `.env` only when absent.
 GitAgent listens on host localhost:3333 by default. OpenCode uses localhost:4096,
 fixed username `opencode`, and mandatory password authentication. Add `/workspace`
 as the OpenCode project on first use. Model selection comes from `agent.yaml`.
+In pinned UI 2.0.28, enable Settings → General → Show agent, leave automatic
+permission approval off, and explicitly select `gitagent-main`. Hidden selection
+forces Build in this client; registered main-agent rules and `default_agent` do
+not prove the browser session uses them. Verify actual session/message agent IDs.
 Recreate the affected container after environment, image, port, or mount changes.
 Starting an existing container retains its creation-time configuration.
 
@@ -302,7 +306,8 @@ Verified 2026-10-17 with CLI 64.5.0 after official web/Context7 research and rea
 [issue #13](https://github.com/tbrandenburg/gitagent-web-chat/issues/13),
 [issue #11's local-only closure](https://github.com/tbrandenburg/gitagent-web-chat/issues/11)
 and [merged PR #16](https://github.com/tbrandenburg/gitagent-web-chat/pull/16).
-**CONDITIONAL GO for protected no-inference preview only; issue #13 is not fixed.**
+**Protected preview experiment only; persistent-chat acceptance remains blocked
+and issue #13 is not fixed.** Owner-approved inference results are recorded below.
 
 ### Cost, protection and build gates
 
@@ -311,14 +316,16 @@ and [merged PR #16](https://github.com/tbrandenburg/gitagent-web-chat/pull/16).
   includes **10 GB/month VCR storage** and its FAQ says Hobby cannot purchase
   additional usage. [Hobby limits](https://vercel.com/docs/plans/hobby) include
   4 CPU-hours, 360 GB-hours and 1 million Function invocations/month, 2 GB/1 vCPU
-  and 300-second requests. Usage is capped, not unlimited; no upgrades, paid
-  add-ons or model requests were made. A current remaining-quota dashboard
+   and 300-second requests. Usage is capped, not unlimited; no upgrades or paid
+   cloud add-ons were enabled. Separately approved inference is recorded below.
+   A current remaining-quota dashboard
   total was not measured. The [registry reference](https://vercel.com/docs/container-registry/limits-and-pricing)
   still shows an unqualified $0.10/GB rate; do not apply Pro pricing to Hobby.
 - The [project creation API](https://vercel.com/docs/rest-api/projects/create-a-new-project)
   accepted `ssoProtection: {deploymentType: "all"}` atomically. Independent GET
   confirmed **All Deployments** protection before upload, no Git link and only
-  Preview password/large-Function settings. No OpenAI/model key was supplied.
+   Preview password/large-Function settings. No model key was supplied initially;
+   a sensitive Preview-only OpenAI key was added after explicit spending approval.
   Passwords were generated securely and stored as sensitive Preview variables;
   temporary auth transport was private and removed. Never print credentials.
 - Nested Services `root: "."` plus the existing Dockerfile **failed in cloud**:
@@ -601,21 +608,74 @@ guide uses older V1 examples/unpinned installation and must not replace this
 repository's pinned V2 exporter/permissions. No Sandbox or persistence resource
 was created for this investigation.
 
-Cloud model credentials remain absent. Genuine normal-chat/production-OKF answers
-and harmless model-mediated shell/write denial require explicit inference-spend
-approval after the deployment/lifecycle gate is addressed. No prompt was submitted
-and no paid model invocation was made; session metadata fixtures do not substitute
-for those acceptance tests.
+### Owner-approved inference and selected-agent regression
+
+After explicit inference-spend approval, the existing active Hobby project was
+reverified with All Deployments protection, no Git link and Preview target. The
+inherited OpenAI key was submitted privately as a **sensitive Preview-only**
+environment variable, never as source, argv or browser data. The same committed
+runtime was deployed to
+[this protected model-enabled Preview](https://gitagent-opencode-issue13-f3occs7as-tom-brandenburgs-projects.vercel.app),
+deployment `dpl_4TuKKXSdRmo2vtwu861JkW9Vv5mp`. No public production deployment or
+automatic paid evaluation was enabled.
+
+The first real browser prompt returned a genuine answer but its actual message
+agent was `build`, not `gitagent-main`. The pinned UI defaults
+[`showCustomAgents: false`](https://github.com/anomalyco/opencode/blob/026b106bc5d41b679ffc413264229c340871e4d3/packages/app/src/settings/model.tsx),
+and its [own setting description](https://github.com/anomalyco/opencode/blob/026b106bc5d41b679ffc413264229c340871e4d3/packages/app/src/runtime/i18n/en.ts)
+states that hidden selection defaults to Build. This is a client-selected profile,
+not failure of the exported main agent's native permission engine. Before further
+probes, the actual UI enabled Show agent, verified auto-approval off, and selected
+`gitagent-main`. Session-creation payloads and genuine reply metadata then matched
+that ID; wrong-profile submissions were blocked by the harness before generation.
+
+| Live check | Observed evidence |
+| --- | --- |
+| Normal question | Genuine `openai/gpt-6-luna` reply from `gitagent-main`, no tools. Its immediate UI observation was inconclusive; do not label that individual render check passed. |
+| Five-day production | Native completed reads of the topic index, canonical overview and shift register; correct 79,860 produced / 78,456 good / 1,404 rejected / 257 downtime minutes, source citations, fabricated-data and safety warnings. The main-agent answer was present in retained rendered browser text. |
+| Model-mediated denial | Actual main-agent shell request to touch a unique disposable marker; the browser's Deny action returned 204. Native tool state recorded `The user declined this tool call`, and the model turn was interrupted. No alternative write was approved. |
+| Same-owner side effect | Immediately afterward, a trusted administrative `session.shell` read-only `test ! -e` check returned 204; its native shell message had exit 0 and `marker-absent`. This endpoint first resolves the same session, avoiding an unrelated instance's filesystem read as the sole proof. A supplemental file read returned 404. The check does not wake model execution. |
+
+The first denial probe established native rejection but its follow-up read could
+not run because rejection aborts the model turn. A later owner-session check was
+404, so a second unique probe captured the immediate owner-bound absence proof.
+No potentially billable prompt was automatically resubmitted. The production
+harness initially misread newest-first message ordering and compared raw Markdown
+against rendered text; the retained actual response/DOM evidence was reassessed
+without another model call. These harness errors are not product failures.
+Original harness result labels were preserved rather than silently rewritten;
+the normalized `acceptance-summary.json` records failed initial agent selection,
+incomplete individual normal-render evidence, corrected production PASS and the
+verified final denial. Do not aggregate raw `result` flags as acceptance status.
+
+Five distinct prompt submissions produced seven observed assistant messages.
+Their runtime-reported response costs sum to approximately **$0.005087075**.
+This excludes unobserved maintenance/title calls and is **not an independently
+verified provider invoice total**. Session IDs, native tool outcomes, token/cost
+metadata and rendered-text evidence were retained under ignored
+`.playwright-mcp/issue13-inference/`. A scoped scan of 125 returned runtime-log
+records found no supplied-key/password/bypass matches; this is not a general
+secret audit. The local private credential file was removed after testing.
+The model-enabled deployment brought the dedicated project's retained ready image
+count to nine, totalling 4,536,918,959 manifest-reported bytes, not billed GB-months.
+The [native session-shell implementation](https://github.com/anomalyco/opencode/blob/026b106bc5d41b679ffc413264229c340871e4d3/packages/core/src/session/session.ts#L179-L222)
+is the source contract for the owner-bound read-only absence check.
+
+Real answers and narrow deployed native-permission behavior are now evidenced,
+but browser SessionNotFound 404s occurred during the paid pass too. The previous
+session-continuity and SSE-cancellation blockers remain; inference approval does
+not imply production or architecture approval. Optional MCP/subagent execution
+and full owner acceptance were not established by these tests.
 
 ### Limits, rollback and research-only alternatives
 
 Workspace edits, runtime Git, XDG/SQLite and conversations remain temporary.
 Native-session continuity failed the idle test. Real model-conversation continuity
 and peak workload resources remain unverified. Browser reload/new-tab and 45-second idle
-reconnection observations above are not durability guarantees. No genuine
-answer, production-data reasoning, model-mediated
-permission denial, MCP/subagent execution or owner signoff is claimed. Model
-inference remains separately billable and unauthorized here.
+reconnection observations above are not durability guarantees. The live inference
+and denial evidence above is scoped; MCP/subagent execution and owner signoff
+remain unverified. Inference is separately billable and must not become an
+automatic PR check merely because this manual pass was approved.
 
 Rollback: keep protection enabled, cancel an in-flight deployment or remove
 only the dedicated preview deployment/project and its VCR repositories after

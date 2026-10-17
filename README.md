@@ -300,6 +300,10 @@ make up-opencode
 Sign in with fixed username **`opencode`** and password **`password`** by
 default (some browser dialogs ask only for the password). On the first visit,
 choose **Add project**, select **`/workspace`**, and start a session.
+For pinned CLI/UI 2.0.28, enable **Settings → General → Show agent**, keep automatic
+permission approval off, and select **`gitagent-main`** before submitting. When
+the selector is hidden, this UI explicitly chooses **Build**, whose permissions
+are not the exported main-agent rules; the server default alone is insufficient.
 For another agent and port:
 
 ```sh
@@ -428,9 +432,11 @@ A no-inference OpenCode preview passed cloud UI/assets, API authentication,
 SSE, exported native main/child rules and source-identical OKF navigation checks
 on an active, usage-capped Hobby account. **All Deployments** Vercel
 Authentication was enabled at project creation, before deployment. GitHub is not
-linked; no autobuilds or model credentials were enabled. This is not completion
-of issue #13: real answers, model-mediated denial, conversation survival and
-owner signoff remain unverified.
+linked and autobuilds remain disabled. Model credentials were withheld during
+the initial probes. Later owner-approved inference verified genuine main-agent
+answers, canonical production retrieval and native permission rejection with
+same-session filesystem absence evidence. This is not completion of issue #13:
+session continuity, cancellation and owner acceptance remain blocked or pending.
 
 Real Chromium password entry, incorrect-password rejection, project selection,
 empty-session UI, reload/new tab and a 45-second idle reconnect were exercised.
@@ -446,10 +452,15 @@ a persistence fix; the original `make up-opencode` launcher is unchanged.
 Native session metadata was also lost after 45 seconds idle, despite successful
 server health checks. Manual export/import was inconsistent across subsequent
 requests. Persistent-chat acceptance remains blocked by Function-local SQLite;
-no database, Sandbox architecture change or paid inference was introduced.
+no database or Sandbox architecture change was introduced.
 SSE cancellation also remains blocked in cloud: baseline and gated streams closed
 by the client still reached Vercel's 300-second timeout. The documented opt-in
 cancellation setting is Node.js-only, not a verified container-runtime fix.
+The limited inference pass used a sensitive Preview-only model key. Five prompt
+submissions produced seven recorded model messages with approximately **$0.0051**
+in runtime-reported response costs, excluding unobserved maintenance calls and
+without independently verified provider billing. See the runtime reference for
+the initial wrong-agent discovery and corrected evidence assessment.
 
 The [preview staging helper](/skills/gitagent/scripts/prepare-opencode-preview.py)
 copies tracked curated inputs outside the repository and generates root Docker
