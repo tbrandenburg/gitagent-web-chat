@@ -20,3 +20,11 @@ Keep the template root agent-first. Reusable tooling, schemas, and dependencies
 belong in `skills/gitagent/`; agent-owned evaluation cases and tests belong in
 `evals/`. Do not add root tooling directories or documentation files without a
 specific need. Keep the root Makefile a thin entry point.
+
+## Lessons Learned
+
+- 2026-10-17: Pitfall: A first Vercel submission became production despite `--target preview`. Prevention: Configure protection before uploading, verify the returned target, and cancel unexpected production assignments before treating a deployment as Preview.
+- 2026-10-17: Pitfall: A nested Vercel Dockerfile used its own directory as build context despite Services `root: "."`. Prevention: Verify context with a real build; stage root Docker artifacts externally when repository-root inputs are required.
+- 2026-10-17: Pitfall: Smoke checks trusted a hosting-domain suffix and optimizable assertions. Prevention: Bind credential transport to an independently verified deployment identity and enforce security gates with explicit exceptions, including optimized-Python regression tests.
+- 2026-10-17: Pitfall: An open port and reloaded browser sidebar concealed startup 503s and lost sessions. Prevention: Gate traffic on authenticated application readiness and verify a real server-stored session across idle/replacement, not browser-local project state.
+- 2026-10-17: Pitfall: The pinned web UI hid agent selection and explicitly chose Build despite an exported default. Prevention: Enable agent selection, verify session creation and response agent IDs, and keep auto-approval disabled before policy tests.

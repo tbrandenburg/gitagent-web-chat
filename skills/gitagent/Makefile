@@ -50,6 +50,7 @@ test:
 	python3 -m unittest discover -s "$(GITAGENT_SKILL_DIR)/tests" -v
 	node --test "$(GITAGENT_SKILL_DIR)/tests/mcp-config.test.mjs"
 	node --test "$(GITAGENT_SKILL_DIR)/tests/permissions.test.mjs"
+	node --test "$(GITAGENT_SKILL_DIR)/tests/opencode-ready.test.mjs"
 
 lint:
 	bash -n "$(GITAGENT_SKILL_DIR)/scripts/web-agent.sh"
@@ -59,6 +60,9 @@ lint:
 	node --check "$(GITAGENT_SKILL_DIR)/bin/export-opencode.mjs"
 	node --check "$(GITAGENT_SKILL_DIR)/bin/mcp-config.mjs"
 	node --check "$(GITAGENT_SKILL_DIR)/bin/permissions.mjs"
+	node --check "$(GITAGENT_SKILL_DIR)/bin/opencode-ready.mjs"
+	node --check "$(GITAGENT_SKILL_DIR)/tests/opencode-ready.test.mjs"
+	node --check "$(GITAGENT_SKILL_DIR)/tests/fixtures/opencode-ready-backend.mjs"
 	python3 -c "import ast,pathlib; [ast.parse(p.read_text()) for d in ('scripts', 'bin', 'tests') for p in pathlib.Path('$(GITAGENT_SKILL_DIR)', d).glob('*.py')]"
 	node --check "$(GITAGENT_SKILL_DIR)/tests/live-chat.mjs"
 	node --check "$(GITAGENT_SKILL_DIR)/tests/live-opencode-mcp.mjs"
