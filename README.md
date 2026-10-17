@@ -489,7 +489,6 @@ gitagent-web-chat/
 │   ├── cases/                    # SQL injection, production, delegation, policy
 │   ├── assertions/               # Actual tool-event and side-effect checks
 │   └── results/                  # Generated output, ignored
-├── docs/evaluation-security.md   # Trusted inputs and dependency advisories
 ├── scripts/
 │   ├── doctor.sh                 # Offline diagnostics without secret reads
 │   ├── validate-manifests.py     # Pinned schema and dependency checks
@@ -558,8 +557,7 @@ provider timeout is in milliseconds; `runner_timeout_seconds` is separate.
 Live evaluations are **not** run on untrusted PRs. The manual
 [live workflow](.github/workflows/agent-evals.yml) requires a repository
 `OPENAI_API_KEY` secret and uploads result artifacts. Offline checks validate
-the config; they do not prove model behavior. See [evaluation security](docs/evaluation-security.md)
-for dependency advisories and trusted-input boundaries.
+the config; they do not prove model behavior.
 
 ### Ownership and enforcement boundaries
 
