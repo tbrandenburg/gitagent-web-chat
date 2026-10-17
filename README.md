@@ -422,6 +422,30 @@ OpenCode is **CONDITIONAL GO for an owner-approved protected cloud experiment**,
 not a production or security-parity claim. No Vercel project or registry upload
 is included; cloud work and inference spending require a separate owner decision.
 
+### Protected Hobby Docker preview (issue #13)
+
+A no-inference OpenCode preview passed cloud UI/assets, API authentication,
+SSE, exported native main/child rules and source-identical OKF navigation checks
+on an active, usage-capped Hobby account. **All Deployments** Vercel
+Authentication was enabled at project creation, before deployment. GitHub is not
+linked; no autobuilds or model credentials were enabled. This is not completion
+of issue #13: real answers, model-mediated denial, conversation survival and
+owner signoff remain unverified.
+
+The [preview staging helper](/skills/gitagent/scripts/prepare-opencode-preview.py)
+copies tracked curated inputs outside the repository and generates root Docker
+build artifacts from the existing pinned image source. Runtime/archive memory,
+workspace state and Docker-excluded tooling are removed **before upload**; known
+credential filenames are rejected. This is not a content-based secret detector:
+review the selected tracked source for arbitrary embedded secrets before staging.
+The smoke helper requires explicitly supplied bypass/password environment values,
+uses private curl configuration files, and never creates a bypass or changes cloud
+settings. Vercel's nested Dockerfile
+build used the wrong context; local Docker behavior is unchanged. See
+[cloud evidence and reproduction](/skills/gitagent/references/runtime-management.md#protected-hobby-preview-issue-13)
+for protection, free-plan limits, the first-deployment production pitfall and
+remaining acceptance gates. Do not import/link GitHub or expose public production.
+
 ## Development
 
 Offline checks require Bash, Make, **Python 3.12**, **Node.js 22.22+**,

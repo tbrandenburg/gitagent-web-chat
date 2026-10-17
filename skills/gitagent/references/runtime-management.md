@@ -9,6 +9,7 @@
 - [Runtime dependencies](#runtime-dependencies)
 - [Checks and troubleshooting](#checks-and-troubleshooting)
 - [Local container feasibility](#local-container-feasibility)
+- [Protected Hobby preview](#protected-hobby-preview-issue-13)
 
 ## Invocation and ownership
 
@@ -295,30 +296,149 @@ settings/file-write/upload/skill-install endpoints. A separate fail-closed
 restriction design and real denial tests are required before cloud exposure;
 this spike does not silently disable those features or change the agent policy.
 
-### Explicit cloud gates — not implemented
+## Protected Hobby preview (issue #13)
 
-Official [Container Runtime](https://vercel.com/docs/functions/runtimes/container)
-documentation auto-detects a root `Dockerfile.vercel`; Services accepts a nested
-Dockerfile entrypoint relative to service root. Local `docker build -f` proves
-repository-root context here, **not** Vercel's nested context or Docker target
-selection. No root configuration was needed for this local experiment. The
-multi-stage target selection and exact per-project cloud entrypoints remain
-unverified; do not invent a target-selection schema or push these images yet.
+Verified 2026-10-17 with CLI 64.5.0 after official web/Context7 research and reading
+[issue #13](https://github.com/tbrandenburg/gitagent-web-chat/issues/13),
+[issue #11's local-only closure](https://github.com/tbrandenburg/gitagent-web-chat/issues/11)
+and [merged PR #16](https://github.com/tbrandenburg/gitagent-web-chat/pull/16).
+**CONDITIONAL GO for protected no-inference preview only; issue #13 is not fixed.**
 
-Prefer separate projects at `/`: GitAgent uses a root WebSocket and OpenCode
-uses root `/_assets` and `/api` paths. No upstream prefix rewrite was attempted.
-The owner must explicitly decide project creation, personal/non-commercial
-Hobby eligibility, **All Deployments** Vercel Authentication, runtime credentials,
-[registry storage costs](https://vercel.com/docs/container-registry/limits-and-pricing),
-and model-inference spending before cloud work. Do not enable GitHub automatic
-deployments before protection and verified entrypoints are ready.
+### Cost, protection and build gates
 
-Hobby's documented 300-second connection/invocation bound and 2 GiB / 1 vCPU
-limit still require cloud measurement, including reconnect/state loss after
-idle. Both local images exceed the generic 250 MB Function bundle limit;
-VCR's 15 GB registry limit is **not proof of deployable Function size**. Confirm
-actual container size eligibility and account costs before upload. Remaining
-cloud tests include build schema/context, protected HTTP/API/stream/socket
-access, temporary filesystem rules, cold start/idle/scale-out, signal handling,
-one approved genuine reply and OKF question, real permission denial, usage and
-owner manual signoff. Neither runtime has a Vercel deployment verdict yet.
+- Filtered account API responses confirmed the explicitly selected scope was
+  active **Hobby**, not a trial/Pro account. [Current pricing](https://vercel.com/pricing)
+  includes **10 GB/month VCR storage** and its FAQ says Hobby cannot purchase
+  additional usage. [Hobby limits](https://vercel.com/docs/plans/hobby) include
+  4 CPU-hours, 360 GB-hours and 1 million Function invocations/month, 2 GB/1 vCPU
+  and 300-second requests. Usage is capped, not unlimited; no upgrades, paid
+  add-ons or model requests were made. A current remaining-quota dashboard
+  total was not measured. The [registry reference](https://vercel.com/docs/container-registry/limits-and-pricing)
+  still shows an unqualified $0.10/GB rate; do not apply Pro pricing to Hobby.
+- The [project creation API](https://vercel.com/docs/rest-api/projects/create-a-new-project)
+  accepted `ssoProtection: {deploymentType: "all"}` atomically. Independent GET
+  confirmed **All Deployments** protection before upload, no Git link and only
+  Preview password/large-Function settings. No OpenAI/model key was supplied.
+  Passwords were generated securely and stored as sensitive Preview variables;
+  temporary auth transport was private and removed. Never print credentials.
+- Nested Services `root: "."` plus the existing Dockerfile **failed in cloud**:
+  Buildah used `skills/gitagent/assets` as context and could not find `agent.yaml`.
+  The [staging helper](/skills/gitagent/scripts/prepare-opencode-preview.py)
+  instead copies tracked curated inputs to an external temporary directory,
+  excludes runtime/archive memory, workspace state and Docker-excluded tooling
+  **before copying/upload**, rejects known credential files and symlinks, and copies the existing
+  Dockerfile and exclusions to `Dockerfile.vercel` and its `.dockerignore` there.
+  [Root auto-detection](https://vercel.com/docs/functions/runtimes/container)
+  then built successfully. No tracked root config or custom UI was needed.
+  The existing final stage is **OpenCode**, derived directly from `source`;
+  GitAgent packages are not inherited. Pins remain OpenGAP 0.5.0 / CLI 2.0.28.
+- `VERCEL_SUPPORT_LARGE_FUNCTIONS=1` was set for Preview with Fluid compute.
+  The [large-Function guide](https://vercel.com/kb/guide/troubleshooting-function-250mb-limit)
+  includes containers up to 5 GB, although the general reference omits them.
+  The actual root-context deployment became **READY on Hobby**; eligibility
+  is now backed by cloud evidence, not the local 1,227,457,565-byte image or
+  VCR's separate 15 GB compressed storage limit.
+- **First-deployment pitfall:** CLI `--target preview` still returned production
+  for a new project, as [documented](https://vercel.com/docs/deployments/environments#first-deployment).
+  It was protected and cancelled; no public production rollout occurred. The
+  API rejects literal `target: "preview"`; omitting target on the subsequent
+  request produced Preview (`target: null`). Later CLI Preview submissions did
+  too. Check the response target, never assume the flag alone proves Preview.
+
+### Reproduction and observed evidence
+
+Prepare only; this command performs no cloud operations:
+
+```sh
+python3 skills/gitagent/scripts/prepare-opencode-preview.py --output /tmp/opencode-preview
+```
+
+Use a new/empty external output directory. Untracked inputs are deliberately not
+uploaded; review the source's tracked inputs before preparing a deployment. The
+helper mirrors the Dockerfile-specific source exclusions before copying and writes
+a `.vercelignore` as upload defense in depth. In particular, tracked
+`memory/runtime`, `memory/archive`, `evals/results`, nested workspace/cache paths,
+and the skill's tests/dependency manifests do not enter the upload directory.
+Known credential names (`auth.json`, `credentials.json`, environment files and
+private-key extensions) fail preparation rather than being uploaded. Arbitrary
+secret-bearing file content still requires source review; this is not a general
+secret scanner or a guarantee that tracked data is safe. Do not add unreviewed
+files to the prepared directory. The helper neither stages nor commits files.
+Before deploying, select and verify an
+active Hobby scope, confirm personal/non-commercial eligibility, create the
+dedicated project with All Deployments auth and no Git repository, verify the
+response, select framework `container`, and set only Preview secrets/settings.
+Do not link GitHub or enable autobuilds. With an existing project whose initial
+deployment has been accounted for:
+
+```sh
+vercel deploy /tmp/opencode-preview --dry --json --scope <hobby-scope> --project <project> --target preview
+vercel deploy /tmp/opencode-preview --scope <hobby-scope> --project <project> --target preview
+python3 skills/gitagent/tests/vercel-opencode-smoke.py --url <protected-preview-url> --agent-dir <selected-local-agent>
+```
+
+The opt-in smoke test needs the matching strong `OPENCODE_SERVER_PASSWORD` and
+an explicitly supplied existing `VERCEL_AUTOMATION_BYPASS_SECRET` in the environment.
+Missing values fail before network access. Use the exact selected Preview's
+`https://<deployment>.vercel.app` URL, without userinfo, path, query or fragment;
+the helper does not establish whether a URL is Preview, so verify that target
+independently before supplying credentials. No authenticated Vercel CLI is needed.
+It sends **no model prompts or shell/write tools**. Direct curl reads the bypass
+header and Basic credentials only from temporary mode-0600 config files inside a
+mode-0700 directory, removed after use; neither credential enters child argv or
+the curl environment. User curlrc is disabled and redirects are not followed.
+The missing-Basic probe receives only the bypass header; signed-out probes use
+separate raw curl requests with neither credential. It never generates/retrieves
+a bypass or mutates cloud settings. The existing cloud bypass remains persistent:
+never share it, or revoke/rotate it without owner approval. Follow the owner's
+credential lifecycle separately; this helper performs no credential cleanup in
+Vercel. Native agent IDs and permission rules are checked against the selected
+local main/declared-child manifests using the existing permission translator,
+not against the deployed export itself. Ordered local rules must be contiguous
+after native defaults, with only deny rules permitted afterward.
+
+After the upload and credential-transport safety fixes, the coordinator prepared
+60 curated tracked inputs, deployed again, and ran the revised smoke successfully
+on 2026-10-17. The existing automation bypass was reused, not generated or rotated;
+a new strong sensitive Preview password was passed in memory and not retained.
+
+Final evidence: [protected Preview](https://gitagent-opencode-issue13-59ocu6qvn-tom-brandenburgs-projects.vercel.app),
+deployment `dpl_3vmGhj76wTtBg2Ee6S6W1zqejwEq`, `READY`, `plan: hobby`, Preview.
+Signed-out UI, **real bundled asset**, API, SSE and PTY path returned Vercel 302
+challenges. Authorized UI/assets returned 200; API without runtime Basic auth
+returned 401 and correct auth returned 200. Generated `/tmp/workspace/opencode.json`,
+main/child IDs and ordered native rules matched the selected local manifests
+after asynchronous registration;
+source-identical OKF root navigation and SSE `server.connected` passed. An early
+probe without waiting saw no custom agents; first HTTP readiness is insufficient.
+Private file-based curl configuration succeeded where stdin-based auth failed.
+Fresh local no-model Docker probes also passed with ports 8080 and 80, restart
+and temporary-marker loss. Existing local containers were preserved.
+After the coordinator's final build, read-only registry inspection returned five ready images totalling
+2,520,489,775 manifest-reported bytes, plus the empty repository from the failed
+nested-context attempt. This sum is not deduplicated billed GB-months or a
+team-wide remaining-quota measurement. The generated password was deliberately
+not disclosed; the owner should set their own strong sensitive Preview password
+and redeploy before browser password-entry/manual signoff.
+
+### Limits, rollback and research-only alternatives
+
+Workspace edits, runtime Git, XDG/SQLite and conversations remain temporary.
+Preview idle scale-down is documented after 30 seconds; usable conversation
+survival, reload/new-tab/cold-start/concurrent behavior, peak memory, signal
+handling, browser password-entry UI and PTY transport were **not verified** by
+these HTTP probes. No genuine answer, production-data reasoning, model-mediated
+permission denial, MCP/subagent execution or owner signoff is claimed. Model
+inference remains separately billable and unauthorized here.
+
+Rollback: keep protection enabled, cancel an in-flight deployment or remove
+only the dedicated preview deployment/project and its VCR repositories after
+owner approval; review retained images against the free cap. Do not delete
+unrelated resources or promote production. No database or persistence layer
+was added.
+
+| Research-only option | Fit and unresolved tradeoff |
+| --- | --- |
+| Docker Function (retained) | Pinned upstream UI/exporter/native permissions passed protected cloud probes; ephemeral Function lifetime and genuine-chat gates remain. |
+| npm Node.js Function | [Handlers and Node servers](https://vercel.com/docs/functions/runtimes/node-js) are supported, but npm installation alone does not adapt this standalone CLI/UI/API/SSE; binary tracing/lifecycle and root layout need proof. No proxy or alternative implemented. |
+| npm in Sandbox | [Official OpenCode guide](https://vercel.com/kb/guide/running-opencode-securely-with-the-vercel-sandbox) is a different MicroVM lifecycle with unpinned installer and different config. [Hobby](https://vercel.com/docs/sandbox/pricing#hobby) includes 5 CPU-hours, 420 GB-hours, 5,000 creations and 20 GB transfer/month, 15 GB lifetime snapshots, 45-minute sessions, no overage charges. Sandbox URL auth needs separate verification. [Snapshots](https://vercel.com/docs/sandbox/concepts/snapshots) persist filesystem checkpoints, not running streams or verified SQLite conversation recovery. Separate approval required; no sandbox created. |
