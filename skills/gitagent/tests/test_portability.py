@@ -26,7 +26,11 @@ class PortabilityTests(unittest.TestCase):
             'name: external-agent\nversion: "1.0.0"\ndescription: Portable fixture\n')
         (self.agent / 'knowledge').mkdir()
         (self.agent / 'knowledge' / 'concept.md').write_text('---\ntype: Concept\n---\nExample\n')
-        self.env = {'PATH': str(Path(sys.executable).parent) + os.pathsep + os.defpath}
+        node = shutil.which('node')
+        if node is None:
+            raise RuntimeError('Node.js is required for portability checks')
+        self.env = {'PATH': os.pathsep.join((str(Path(sys.executable).parent),
+                                            str(Path(node).parent), os.defpath))}
 
     def make(self, *args, cwd=None):
         return subprocess.run(['make', '--no-print-directory', '-f',
