@@ -26,6 +26,26 @@ runtime compatibility fixes. It does not include a custom chat server or UI.
 [OpenCode](#optional-opencode-v2) · [Troubleshooting](#troubleshooting) ·
 [Development](#development)
 
+### Retained named Sandbox follow-up (issue #13)
+
+An opt-in `opencode-sandbox` image target preserves the unchanged pinned OpenCode
+UI/exporter/native permissions while retaining workspace and SQLite under
+`/var/tmp/gitagent-opencode`. Standard Nginx Basic auth protects the complete
+Sandbox route, including static assets, API, SSE and WebSockets. Vercel Deployment
+Protection does **not** protect the independent `vercel.run` URL.
+
+Use the explicit host controller `skills/gitagent/scripts/opencode-sandbox.py`
+with `start`, `resume`, `status` or `stop` and mandatory scope, project, name and
+immutable VCR image. First bootstrap is model-free; `--with-model` requires a
+previously protection-verified, stopped Sandbox. No automatic deletion, expiry
+recreation, browser-triggered resume, inference or production promotion.
+See [commands, limits and acceptance checklist](/skills/gitagent/references/runtime-management.md#retained-named-sandbox-follow-up).
+Local no-model Docker tests cover authentication, actual SSE/PTY WebSocket,
+shutdown and native session metadata after process restart. **Cloud gateway,
+VM snapshot recovery and genuine browser conversation continuity still require
+the coordinator's separate manual acceptance.** Existing Function and local
+Docker workflows are unchanged.
+
 ## Quick start
 
 ### Prerequisites

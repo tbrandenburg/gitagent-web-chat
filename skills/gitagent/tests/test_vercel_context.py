@@ -42,6 +42,17 @@ class VercelContextFixture:
         (self.agent / 'skills/gitagent/bin/okf').chmod(0o755)
         self.git('add', '.')
         self.git('commit', '--quiet', '-m', 'fixture')
+        # Real clean-HEAD checks must inspect a committed fixture, not developer edits.
+        packaged = self.root / 'packaged skill'
+        (packaged / 'assets').mkdir(parents=True)
+        for name in ('Dockerfile.feasibility', 'Dockerfile.feasibility.dockerignore'):
+            (packaged / 'assets' / name).write_bytes((SKILL / 'assets' / name).read_bytes())
+        for command in (['init', '--quiet'], ['add', '.'], ['commit', '--quiet', '-m', 'artifact fixture']):
+            subprocess.run(['git', *command], cwd=packaged, env=self.environment,
+                           capture_output=True, timeout=15, check=True)
+        artifacts = patch.dict(prepare.__globals__, {'SKILL': packaged})
+        artifacts.start()
+        self.addCleanup(artifacts.stop)
 
     def git(self, *args):
         return subprocess.run(['git', *args], cwd=self.agent, capture_output=True,
@@ -49,6 +60,14 @@ class VercelContextFixture:
 
 
 class VercelContextTests(VercelContextFixture, unittest.TestCase):
+    def test_dirty_packaged_docker_artifact_fails_before_output_creation(self):
+        packaged = prepare.__globals__['SKILL'] / 'assets/Dockerfile.feasibility'
+        packaged.write_text('uncommitted artifact\n')
+        with self.assertRaisesRegex(ValueError, 'clean against HEAD'):
+            prepare(self.agent, self.output)
+        self.assertFalse(self.output.exists())
+        self.assertEqual(packaged.read_text(), 'uncommitted artifact\n')
+
     def test_root_context_preserves_source_and_excludes_untracked_state(self):
         (self.agent / '.env').write_text('NOT_A_REAL_SECRET=canary\n')
         (self.agent / 'skills/domain/scratch.txt').write_text('untracked\n')
