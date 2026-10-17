@@ -438,7 +438,7 @@ team-wide remaining-quota measurement. The generated password was deliberately
 not disclosed; the owner should set their own strong sensitive Preview password
 and redeploy before browser password-entry/manual signoff.
 
-### Real Chromium browser QA
+### Initial Chromium browser QA (before startup gate)
 
 The coordinator exercised the actual upstream UI using Playwright/Chromium,
 not injected Basic-auth headers or mocked responses. A fresh signed-out browser
@@ -451,15 +451,15 @@ second browser tab worked. After closing the tabs for 45 seconds, the project
 UI reconnected and completed loading. No prompt or model call was submitted;
 these checks do not prove conversation survival or instance replacement.
 
-**Browser reliability remains BROKEN:** repeat runs exposed intermittent 503
+**Initial browser reliability failed:** repeat runs exposed intermittent 503
 responses for `/api/command`, `/api/skill` and `/api/integration`, confirmed in
 Vercel request logs. The UI displayed `Request failed / UnexpectedStatus: 503`;
 one folder-picker attempt displayed `Unable to read this folder`. Later attempts
 loaded successfully, which does not resolve the intermittent failure. Runtime
 logs also recorded exit 130, but the received signal and causation were unproven. Zero JavaScript
 page errors were observed; the wrong-password 401s were expected. Aborted
-worktree-refresh requests occurred during navigation. Preserve this as a release
-blocker, not a passing cloud-reliability claim.
+worktree-refresh requests occurred during navigation. These baseline failures
+motivated the startup fix and regression evidence below.
 
 The browser harness ran as `node /tmp/opencode/issue13-browser-acceptance.mjs`,
 with test credentials piped privately on stdin and no trace/HAR recording.
@@ -515,13 +515,52 @@ retry, native missing/incorrect auth 401, registered exported permissions, bundl
 assets and actual SSE cancellation, initially and after restart. Synthetic
 transport/lifecycle tests separately exercise half-close, large responses,
 upgrades, timeout, missing agents, startup/child exit, signals and port collision.
-These synthetic tests are not cloud E2E. The coordinator must repeat the real
-48-request idle scenario and browser password login before claiming the cloud
-startup blocker fixed. `/api/info.urls` advertises the internal listener; URL
-advertisement, real cloud PTY/WebSocket behavior, startup deadlines and session
-durability are not fixed by this gate. Native permissions and the original
+These synthetic tests are not cloud E2E. The subsequent protected regression of
+commit `d4cac9f` passed on
+[this Hobby Preview](https://gitagent-opencode-issue13-c50y3hr9c-tom-brandenburgs-projects.vercel.app),
+deployment `dpl_4efDQfeNyL1fF2XEXYqcD34kX4Wk`: **48/48 native API responses were
+200**, including the first max-four-concurrent burst after 45 seconds idle, with
+no caller retries. Three real Chromium cycles passed password login, project
+selection, empty-session UI, reload/new tab and idle reconnect: **223 API responses,
+zero HTTP 5xx and zero page errors**. The scoped protection/native-permission/OKF/
+SSE smoke also passed. An authenticated native PTY ticket and WebSocket delivered
+the output of a harmless `printf`/exit fixture; an actual signed-out upgrade
+received Vercel's 302 challenge. That administrative transport probe is not a
+model-mediated permission test.
+
+The local full gate passed **107 tests**, plus lint, manifest/OKF validation,
+doctor and evaluation-config checks. The image audit inspected 14,186 layer files
+without supplied-key/canary matches. Eight retained ready cloud images totalled
+4,032,801,107 manifest-reported bytes; that is not deduplicated GB-months, an
+invoice or a team-wide remaining-quota measurement.
+
+`/api/info.urls` advertises the internal listener; public pairing advertisement
+and general workload limits are not fixed by the gate. Native permissions and the original
 `scripts/opencode-web.sh` local workflow remain unchanged. No model call is needed
 or authorized for these checks.
+
+### SSE cancellation control: unresolved container lifecycle
+
+Runtime-log review found 12 `/api/event` invocations reaching the 300-second
+Function limit after the browser contexts had closed. A controlled comparison
+then opened one genuine native SSE stream on the original baseline and one on
+the gated deployment, read `server.connected`, and closed each response after
+approximately 0.3 seconds. Both exact request IDs later logged
+`Vercel Runtime Timeout Error: Task timed out after 300 seconds`:
+
+| Runtime | Request ID | Client close | Runtime timeout |
+| --- | --- | --- | --- |
+| Baseline | `ssj5z-1792259953289-d8b87dd396c5` | 0.307s | 300s |
+| Readiness gated | `mslck-1792259962312-5f96081b6566` | 0.303s | 300s |
+
+The baseline comparison rules out this being introduced solely by the new relay;
+local real-socket cancellation tests also pass. It does not reveal Vercel's
+private disconnect propagation internals. The [Function cancellation reference](https://vercel.com/docs/functions/functions-api-reference#cancel-requests)
+documents `supportsCancellation` as **Node.js-only**. The examined container
+builder does not expose it. Do not invent support for containers, raise duration
+to hide the issue, or force periodic stream closure and call that cancellation.
+Cloud streaming cancellation/lifetime remains an acceptance blocker, separately
+from the now-passing startup-503 regression. No provider/model request was involved.
 
 ### Session-lifetime RCA and remaining model gates
 
@@ -531,6 +570,10 @@ for 45 seconds, three subsequent session reads returned 404 `SessionNotFoundErro
 while `/api/info` returned 200. Browser-local project selection surviving reload
 is therefore not evidence that an OpenCode session survived. This is a demonstrated
 session-continuity failure, not a missing model key or a permission denial.
+The same test failed independently on the readiness-gated deployment: each of
+three health responses was 200 while each corresponding session read was 404.
+Native metadata export/import then restored that fixture in this run, and its
+cleanup returned 204; this does not erase the earlier inconsistent restore result.
 
 The session five-Whys chain is separate from readiness: the session ID is absent
 from the database serving later requests; OpenCode stores sessions in local SQLite;
@@ -567,9 +610,8 @@ for those acceptance tests.
 ### Limits, rollback and research-only alternatives
 
 Workspace edits, runtime Git, XDG/SQLite and conversations remain temporary.
-Preview idle scale-down is documented after 30 seconds; usable conversation
-survival, confirmed cold-start/load behavior, peak memory, signal handling and
-PTY transport remain unverified. Browser reload/new-tab and 45-second idle
+Native-session continuity failed the idle test. Real model-conversation continuity
+and peak workload resources remain unverified. Browser reload/new-tab and 45-second idle
 reconnection observations above are not durability guarantees. No genuine
 answer, production-data reasoning, model-mediated
 permission denial, MCP/subagent execution or owner signoff is claimed. Model
