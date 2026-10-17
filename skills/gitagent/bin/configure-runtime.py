@@ -74,9 +74,25 @@ def configure_text_chat(path: Path) -> None:
     path.write_text(source)
 
 
+def configure_journal(path: Path) -> None:
+    replacements = (
+        ('join(agentDir, "memory", "journal")', 'join(agentDir, ".gitagent", "journal")'),
+        ('git add "memory/journal/${date}.md"', 'git add -f ".gitagent/journal/${date}.md"'),
+    )
+    source = path.read_text()
+    if all(source.count(updated) == 1 for _, updated in replacements):
+        return
+    if any(source.count(original) != 1 for original, _ in replacements):
+        raise ValueError('Unexpected GitAgent journal writer; runtime isolation cannot be applied safely')
+    for original, updated in replacements:
+        source = source.replace(original, updated)
+    path.write_text(source)
+
+
 if __name__ == '__main__':
     configure(Path(sys.argv[1]))
     configure_mcp(Path(sys.argv[1]).parent / 'mcp/manager.js')
     if len(sys.argv) > 2:
         configure_auth(Path(sys.argv[2]))
         configure_text_chat(Path(sys.argv[2]))
+        configure_journal(Path(sys.argv[2]))

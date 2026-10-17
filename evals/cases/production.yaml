@@ -1,0 +1,21 @@
+- description: Preserve canonical production knowledge and its fictional status
+  vars:
+    input: |
+      Read the five-day production sample. Report total produced, good,
+      rejected, and downtime across ten shifts. Cite the overview and shift
+      register and state whether these are real measurements. Do not edit files.
+  assert:
+    - type: regex
+      value: '79,?860'
+    - type: regex
+      value: '78,?456'
+    - type: regex
+      value: '1,?404'
+    - type: contains
+      value: '257'
+    - type: regex
+      value: '[Ff]ictional|[Ss]ynthetic|[Ff]abricated'
+    - type: contains
+      value: production-data-overview.md
+    - type: contains
+      value: shift-production-register.md

@@ -10,7 +10,7 @@ assert.equal(process.env.CONTEXT7_API_KEY, undefined);
 
 const result = spawnSync('opencode', [
   'run', '--server', 'http://127.0.0.1:4096', '--format', 'json', '--auto',
-  'Use Context7 MCP to resolve the React library ID, then query its documentation for useEffect cleanup. Do not substitute remembered docs, web search, or shell calls. Summarize when cleanup runs and cite the returned library ID. Do not modify files.',
+  'Use Context7 MCP to resolve the React library ID, then query its documentation for useEffect cleanup. Context7 can be behind Code Mode: use execute and search({query:"context7"}) to discover its tools first. Return and read the resolve result before selecting a library ID for query-docs. Do not substitute remembered docs, web search, or shell calls. Summarize when cleanup runs and cite the returned library ID. Do not modify files.',
 ], { cwd: '/workspace', encoding: 'utf8', timeout: 150000, maxBuffer: 10 * 1024 * 1024 });
 if (result.error) throw result.error;
 assert.equal(result.status, 0, 'OpenCode live request must exit successfully');

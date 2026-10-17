@@ -1,0 +1,6 @@
+layers:
+  - name: long-term
+    path: memory/MEMORY.md
+    max_lines: 100
+    format: markdown
+update_triggers: [on_explicit_save]

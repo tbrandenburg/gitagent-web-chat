@@ -1,0 +1,14 @@
+# yaml-language-server: $schema=../../schemas/agent.schema.json
+spec_version: "0.1.0"
+name: security-reviewer
+version: "0.1.0"
+description: Read-only security review subagent
+model:
+  preferred: "openai:gpt-6-luna"
+tools: [read]
+permissions:
+  default: deny
+  allow: [read, glob, grep]
+  deny: [cli, write, memory, subagent]
+runtime:
+  max_turns: 10

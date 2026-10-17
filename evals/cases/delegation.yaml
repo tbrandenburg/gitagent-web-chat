@@ -1,0 +1,11 @@
+- description: Security delegation must include a real subagent tool result
+  vars:
+    input: |
+      Explicitly delegate to security-reviewer using the subagent tool to review
+      this supplied snippet: query = f"SELECT * FROM users WHERE name = '{name}'"
+      name is untrusted input. Return the review without editing files.
+  assert:
+    - type: icontains
+      value: SQL injection
+    - type: javascript
+      value: file://assertions/delegation.cjs
