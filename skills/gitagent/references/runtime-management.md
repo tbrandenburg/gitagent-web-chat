@@ -62,12 +62,14 @@ OpenCode mounts source read-only at `/source-agent` and copies it into writable
 The exporter replaces those generated files; do not invoke it against hand-edited
 configuration without intending replacement.
 
-`refresh` validates `$AGENT_DIR/knowledge` and refreshes both runtimes, starting
-missing containers. It therefore requires host Python/PyYAML and model credentials.
+`refresh` validates the selected manifest and its optional knowledge/memory
+bundles, then refreshes both runtimes, starting missing containers. It therefore
+requires host Python/PyYAML/jsonschema and model credentials.
 Use an individual launcher for a single runtime. OpenCode refresh replaces its
 knowledge, identity, rules, manifest, and skills from source before re-exporting.
 It also refreshes declared subagents and overlays curated memory without
 deleting runtime memory. It does not synchronize arbitrary workspace files or workflows.
+Copied skills exclude `node_modules` and generated caches on startup and refresh.
 
 Keep `SKILL.md` concise: the pinned OpenGAP exporter includes discovered skill
 instructions in generated agent instructions. Bundled reference files are not
@@ -82,6 +84,8 @@ workspace edits. Host source files remain. Save intended workspace changes first
 Existing containers refer to the old host helper paths. `start` and `refresh`
 cannot update their stored mounts. An old OpenCode workspace may also retain the
 former root `scripts/`, `bin/`, and `tests/` after a refresh.
+Embedded startup commands are retained too; older containers do not acquire the
+nested-dependency copy exclusions until deliberately recreated.
 
 1. Save OpenCode workspace edits and any runtime history you need.
 2. Obtain explicit approval before removing an existing container.
@@ -96,7 +100,10 @@ Do not delete and recreate host directories while they are bind-mounted.
 ## Runtime dependencies
 
 Host launch: Bash, GNU Make, Git, curl, sha256sum, Docker, network, and model access.
-Host offline checks: Python 3.12, PyYAML 6.0.3, Node.js 22.
+Host offline checks: Python 3.12, PyYAML 6.0.3, jsonschema 4.26.0, Node.js 22.22+.
+Install with `python3 -m pip install -r "$SKILL_DIR/requirements-dev.txt"`.
+Promptfoo dependencies and lockfile live inside this skill; use
+`npm ci --prefix "$SKILL_DIR"` (npm 10.9.4 matches CI).
 The containers install their own Node/Python utilities on first startup.
 
 | Runtime | Pinned packages |
@@ -157,6 +164,15 @@ JSON output contains `output` and `metadata.tools`, preserving completed and
 failed tool events for evidence-based assertions. Runtime errors and missing
 assistant output fail, rather than returning a canned response. It supports
 `target=main` only; test a subagent through actual main-agent delegation.
+
+Use the skill Makefile's `eval-validate` and `eval` targets with `AGENT_DIR`.
+They select `<agent>/evals/promptfooconfig.yaml` by default (`EVAL_CONFIG` can
+override it), pass `GITAGENT_AGENT_DIR` as an absolute path, and write results to
+the selected agent's `evals/results/latest.json`. Promptfoo state stays under
+`.gitagent/promptfoo/`; neither state nor results are part of the skill package.
+The Python provider also accepts an explicit absolute `agent_path` config.
+Optional `absent_paths` checks report `metadata.absentPaths` for agent-owned
+side-effect assertions. Paths must stay within `/workspace/`.
 
 Refresh the selected runtime before evaluations. Copying an agent to another
 host path selects another container. If mounts predate `permissions.mjs`,

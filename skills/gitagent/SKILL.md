@@ -51,7 +51,11 @@ make -f "$SKILL_DIR/Makefile" validate AGENT_DIR="$AGENT_DIR"
 make -f "$SKILL_DIR/Makefile" lint test
 ```
 
-Require Python 3.12, PyYAML 6.0.3, and Node.js 22 for offline checks.
+Require Python 3.12, PyYAML 6.0.3, jsonschema 4.26.0, and Node.js 22.22+ for
+offline checks. Install Python dependencies from this skill's
+`requirements-dev.txt`. `validate` checks the selected manifest and its optional
+knowledge/memory bundles using schemas bundled in `assets/schemas/`.
+Use `doctor` for the same offline diagnostics and dependency checks.
 Use `test-live` for a real GitAgent response, `test-gitagent-mcp-live` for
 GitAgent Context7 calls, or `test-mcp-live` for OpenCode Context7 calls.
 Run live checks only against the intended running agent; they consume API tokens.
@@ -73,6 +77,13 @@ fresh session; failures, empty output, and timeouts fail explicitly. Only the
 main target is supported: test delegation by requesting a real child tool call.
 Native Promptfoo suites belong to the agent (`evals/`); the provider can call
 this runner. Never count a textual claim of delegation as proof of execution.
+
+Install evaluation tooling with `npm ci --prefix "$SKILL_DIR"`, then use
+`make -f "$SKILL_DIR/Makefile" eval-validate AGENT_DIR="$AGENT_DIR"` or `eval`.
+The Makefile passes the absolute selected agent path to the provider and keeps
+results in that agent's `evals/results/`, with Promptfoo state in `.gitagent/`.
+Override `EVAL_CONFIG` for a suite at another absolute path. Agent-owned
+`absent_paths` checks are configured in the suite, not hardcoded in the skill.
 
 The exporter maps the optional manifest permissions extension and declared
 subagents to native V2 configuration. This is not a Docker sandbox, and does

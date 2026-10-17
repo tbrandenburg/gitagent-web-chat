@@ -7,7 +7,7 @@ import unittest
 
 import yaml
 
-BASE = Path(__file__).resolve().parents[1]
+BASE = Path(__file__).resolve().parents[2]
 CLI = BASE / 'skills' / 'gitagent' / 'bin' / 'okf'
 
 

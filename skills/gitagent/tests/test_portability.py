@@ -1,7 +1,9 @@
 """Run relocated tooling from unrelated directories using actual executables."""
 from pathlib import Path
+import os
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -16,13 +18,19 @@ class PortabilityTests(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
         self.skill = self.root / 'tooling with spaces'
-        shutil.copytree(BASE, self.skill, ignore=shutil.ignore_patterns('__pycache__'))
+        shutil.copytree(BASE, self.skill,
+                        ignore=shutil.ignore_patterns('__pycache__', 'node_modules', '.promptfoo'))
         self.agent = self.root / 'external agent'
         self.agent.mkdir()
-        (self.agent / 'agent.yaml').write_text('name: external-agent\n')
+        (self.agent / 'agent.yaml').write_text(
+            'name: external-agent\nversion: "1.0.0"\ndescription: Portable fixture\n')
         (self.agent / 'knowledge').mkdir()
         (self.agent / 'knowledge' / 'concept.md').write_text('---\ntype: Concept\n---\nExample\n')
-        self.env = {'PATH': '/usr/local/bin:/usr/bin:/bin'}
+        node = shutil.which('node')
+        if node is None:
+            raise RuntimeError('Node.js is required for portability checks')
+        self.env = {'PATH': os.pathsep.join((str(Path(sys.executable).parent),
+                                            str(Path(node).parent), os.defpath))}
 
     def make(self, *args, cwd=None):
         return subprocess.run(['make', '--no-print-directory', '-f',
@@ -52,6 +60,18 @@ class PortabilityTests(unittest.TestCase):
                 self.assertNotEqual(result.returncode, 0)
                 self.assertIn('Set OPENAI_API_KEY', result.stderr)
                 self.assertNotIn('Missing ', result.stderr)
+
+    def test_copied_diagnostics_validate_optional_bundles_without_repo_tooling(self):
+        result = self.make('doctor', f'AGENT_DIR={self.agent}', cwd=self.root)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('Offline diagnostics passed.', result.stdout)
+        self.assertFalse((self.agent / 'schemas').exists())
+        self.assertFalse((self.agent / 'package.json').exists())
+        (self.agent / 'memory').mkdir()
+        (self.agent / 'memory/broken.md').write_text('not OKF\n')
+        result = self.make('validate')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('broken.md: missing YAML frontmatter', result.stdout)
 
     def test_packaged_entrypoint_and_executable_resources(self):
         raw = (self.skill / 'SKILL.md').read_text()

@@ -5,7 +5,11 @@ PORT ?=
 OPENCODE_PORT ?=
 export CHAT_PORT_OVERRIDE := $(PORT)
 export OPENCODE_PORT_OVERRIDE := $(OPENCODE_PORT)
-.PHONY: up down refresh logs status shell validate search test lint test-live test-mcp-live test-gitagent-mcp-live up-opencode down-opencode logs-opencode status-opencode shell-opencode
+.PHONY: up down refresh logs status shell validate doctor eval eval-validate search test lint test-live test-mcp-live test-gitagent-mcp-live up-opencode down-opencode logs-opencode status-opencode shell-opencode
+EVAL_CONFIG ?= $(abspath $(AGENT_DIR))/evals/promptfooconfig.yaml
+export GITAGENT_AGENT_DIR := $(abspath $(AGENT_DIR))
+export PROMPTFOO_CONFIG_DIR := $(abspath $(AGENT_DIR))/.gitagent/promptfoo
+export PROMPTFOO_DISABLE_TELEMETRY := 1
 
 up:
 	"$(GITAGENT_SKILL_DIR)/scripts/web-agent.sh" start "$(AGENT_DIR)"
@@ -27,7 +31,17 @@ shell:
 	"$(GITAGENT_SKILL_DIR)/scripts/web-agent.sh" shell "$(AGENT_DIR)"
 
 validate:
-	python3 "$(GITAGENT_SKILL_DIR)/bin/okf" --root "$(AGENT_DIR)/knowledge" validate
+	python3 "$(GITAGENT_SKILL_DIR)/scripts/validate-manifests.py" --root "$(AGENT_DIR)"
+	python3 "$(GITAGENT_SKILL_DIR)/scripts/validate-okf.py" --root "$(AGENT_DIR)"
+
+doctor:
+	bash "$(GITAGENT_SKILL_DIR)/scripts/doctor.sh" "$(AGENT_DIR)"
+
+eval:
+	npm --prefix "$(GITAGENT_SKILL_DIR)" run eval -- --config "$(EVAL_CONFIG)" --output "$(abspath $(AGENT_DIR))/evals/results/latest.json"
+
+eval-validate:
+	npm --prefix "$(GITAGENT_SKILL_DIR)" run eval:validate -- --config "$(EVAL_CONFIG)"
 
 search:
 	python3 "$(GITAGENT_SKILL_DIR)/bin/okf" --root "$(AGENT_DIR)/knowledge" search "$(QUERY)"
@@ -40,10 +54,11 @@ test:
 lint:
 	bash -n "$(GITAGENT_SKILL_DIR)/scripts/web-agent.sh"
 	bash -n "$(GITAGENT_SKILL_DIR)/scripts/opencode-web.sh"
+	bash -n "$(GITAGENT_SKILL_DIR)/scripts/doctor.sh"
 	node --check "$(GITAGENT_SKILL_DIR)/bin/export-opencode.mjs"
 	node --check "$(GITAGENT_SKILL_DIR)/bin/mcp-config.mjs"
 	node --check "$(GITAGENT_SKILL_DIR)/bin/permissions.mjs"
-	python3 -c "import ast,pathlib; ast.parse(pathlib.Path('$(GITAGENT_SKILL_DIR)/bin/run-eval.py').read_text())"
+	python3 -c "import ast,pathlib; [ast.parse(p.read_text()) for d in ('scripts', 'bin') for p in pathlib.Path('$(GITAGENT_SKILL_DIR)', d).glob('*.py')]"
 	node --check "$(GITAGENT_SKILL_DIR)/tests/live-chat.mjs"
 	node --check "$(GITAGENT_SKILL_DIR)/tests/live-opencode-mcp.mjs"
 

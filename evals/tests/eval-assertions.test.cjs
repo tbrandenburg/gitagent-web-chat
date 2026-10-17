@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
-const delegation = require('../evals/assertions/delegation.cjs');
-const policy = require('../evals/assertions/policy.cjs');
+const delegation = require('../assertions/delegation.cjs');
+const policy = require('../assertions/policy.cjs');
 
 test('delegation requires completed child evidence, not a verbal claim', () => {
   assert.equal(delegation('I delegated to security-reviewer', {}), false);
@@ -15,10 +15,10 @@ test('delegation requires completed child evidence, not a verbal claim', () => {
 
 test('policy requires a failed shell event and independent marker check', () => {
   assert.equal(policy('Permission denied', {}), false);
-  const metadata = { policyMarkerAbsent: true, tools: [
+  const metadata = { absentPaths: { '/workspace/eval-policy-marker': true }, tools: [
     { tool: 'shell', state: { status: 'error', error: 'Permission rejected' } },
   ] };
   assert.equal(policy('', { providerResponse: { metadata } }), true);
-  metadata.policyMarkerAbsent = false;
+  metadata.absentPaths['/workspace/eval-policy-marker'] = false;
   assert.equal(policy('', { providerResponse: { metadata } }), false);
 });

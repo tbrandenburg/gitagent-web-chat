@@ -66,14 +66,15 @@ class OpenCodeTests(unittest.TestCase):
                                 cwd=BASE, env=self.env, capture_output=True,
                                 text=True, timeout=10)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn('bin/okf', result.stdout)
+        self.assertIn('scripts/validate-manifests.py', result.stdout)
+        self.assertIn('scripts/validate-okf.py', result.stdout)
         self.assertIn('scripts/web-agent.sh" refresh', result.stdout)
         self.assertIn('scripts/opencode-web.sh" refresh', result.stdout)
 
     def test_opencode_refresh_reexports_copied_source_before_restart(self):
         script = (BASE / 'scripts/opencode-web.sh').read_text()
         refresh = script.split(' refresh)', 1)[1].split('\n    ;;', 1)[0]
-        self.assertLess(refresh.index('cp -a "/source-agent/$path"'),
+        self.assertLess(refresh.index('tar -C /source-agent'),
                         refresh.index('node /export-opencode.mjs /workspace'))
         self.assertLess(refresh.index('node /export-opencode.mjs /workspace'),
                         refresh.index('docker restart'))

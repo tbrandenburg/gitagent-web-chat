@@ -9,6 +9,7 @@ import sys
 from jsonschema import Draft202012Validator
 import yaml
 
+SCHEMAS = Path(__file__).resolve().parents[1] / 'assets/schemas'
 
 def validate_skills(root: Path) -> list[str]:
     errors = []
@@ -65,7 +66,7 @@ def validate(root: Path) -> list[str]:
     for path, schema in contracts:
         label = path.relative_to(root)
         try:
-            contract = json.loads((root / 'schemas' / f'{schema}.schema.json').read_text())
+            contract = json.loads((SCHEMAS / f'{schema}.schema.json').read_text())
             Draft202012Validator.check_schema(contract)
             manifest = yaml.safe_load(path.read_text())
             violations = list(Draft202012Validator(contract).iter_errors(manifest))
@@ -80,7 +81,7 @@ def validate(root: Path) -> list[str]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--root', type=Path, default=Path(__file__).resolve().parents[1])
+    parser.add_argument('--root', type=Path, default=Path.cwd())
     args = parser.parse_args()
     errors = validate(args.root.resolve())
     for error in errors:

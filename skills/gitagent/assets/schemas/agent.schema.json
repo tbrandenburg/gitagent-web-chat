@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/tbrandenburg/gitagent-web-chat/schemas/agent.schema.json",
+  "$id": "https://github.com/tbrandenburg/gitagent-web-chat/skills/gitagent/assets/schemas/agent.schema.json",
   "title": "gitagent Manifest",
   "description": "Schema for agent.yaml — the gitagent manifest file",
   "type": "object",
