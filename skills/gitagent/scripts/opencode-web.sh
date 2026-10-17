@@ -65,7 +65,7 @@ case "$COMMAND" in
             apt-get install -y -qq --no-install-recommends git ca-certificates python3 python3-yaml >/dev/null
             npm install -g @open-gitagent/opengap@0.5.0 @opencode/cli@2.0.28
             tar -C /source-agent --exclude=.git --exclude=".env*" --exclude=.gitagent \
-              --exclude=.playwright-mcp --exclude=node_modules --exclude=__pycache__ \
+              --exclude=.playwright-mcp --exclude=node_modules --exclude=__pycache__ --exclude=.ruff_cache \
               --exclude=memory/runtime --exclude=memory/archive --exclude=evals/results \
               --exclude=.promptfoo --exclude=workspace -cf - . | tar -C /workspace -xf -
             git -C /workspace init --initial-branch=main
@@ -74,7 +74,8 @@ case "$COMMAND" in
           for path in knowledge RULES.md SOUL.md DUTIES.md agent.yaml skills agents; do
             rm -rf "/workspace/$path"
             if [[ -e "/source-agent/$path" ]]; then
-              cp -a "/source-agent/$path" "/workspace/$path"
+              tar -C /source-agent --exclude=node_modules --exclude=__pycache__ \
+                --exclude=.promptfoo --exclude=.ruff_cache -cf - "$path" | tar -C /workspace -xf -
             fi
           done
           mkdir -p /workspace/memory
@@ -98,7 +99,8 @@ case "$COMMAND" in
         for path in knowledge RULES.md SOUL.md DUTIES.md agent.yaml skills agents; do
           rm -rf "/workspace/$path"
           if [[ -e "/source-agent/$path" ]]; then
-            cp -a "/source-agent/$path" "/workspace/$path"
+            tar -C /source-agent --exclude=node_modules --exclude=__pycache__ \
+              --exclude=.promptfoo --exclude=.ruff_cache -cf - "$path" | tar -C /workspace -xf -
           fi
         done
         mkdir -p /workspace/memory
@@ -115,7 +117,7 @@ case "$COMMAND" in
     for attempt in {1..180}; do
       if docker exec "$NAME" sh -lc '
         diff -qr /source-agent/knowledge /workspace/knowledge >/dev/null &&
-        diff -qr /source-agent/skills /workspace/skills >/dev/null &&
+        diff -qr -x node_modules -x __pycache__ -x .promptfoo -x .ruff_cache /source-agent/skills /workspace/skills >/dev/null &&
         diff -q /source-agent/RULES.md /workspace/RULES.md >/dev/null &&
         diff -q /source-agent/SOUL.md /workspace/SOUL.md >/dev/null &&
         diff -q /source-agent/agent.yaml /workspace/agent.yaml >/dev/null &&

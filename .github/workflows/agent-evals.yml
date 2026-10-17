@@ -16,8 +16,9 @@ jobs:
         with:
           node-version: '22.22.0'
           cache: npm
-      - run: python -m pip install -r requirements-dev.txt
-      - run: npm ci
+          cache-dependency-path: skills/gitagent/package-lock.json
+      - run: python -m pip install -r skills/gitagent/requirements-dev.txt
+      - run: npm ci --prefix skills/gitagent
       - run: make up-opencode
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}

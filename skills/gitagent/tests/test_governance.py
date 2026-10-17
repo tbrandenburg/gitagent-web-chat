@@ -2,24 +2,36 @@
 import importlib.util
 import json
 from pathlib import Path
-import shutil
 import subprocess
 import sys
 import tempfile
 import unittest
 
-ROOT = Path(__file__).resolve().parents[1]
-SPEC = importlib.util.spec_from_file_location('manifests', ROOT / 'scripts/validate-manifests.py')
+SKILL = Path(__file__).resolve().parents[1]
+SPEC = importlib.util.spec_from_file_location('manifests', SKILL / 'scripts/validate-manifests.py')
 VALIDATOR = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(VALIDATOR)
 
 
 class GovernanceTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory(prefix='governed agent ')
+        self.addCleanup(self.temp.cleanup)
+        self.agent = Path(self.temp.name)
+        (self.agent / 'agent.yaml').write_text(
+            'name: fixture-agent\nversion: "1.0.0"\ndescription: Fixture\n'
+            'permissions: {default: deny, allow: [read, subagent], ask: [cli]}\n'
+            'agents: {reviewer: {}}\n')
+        child = self.agent / 'agents/reviewer'
+        child.mkdir(parents=True)
+        (child / 'agent.yaml').write_text(
+            'name: reviewer\nversion: "1.0.0"\ndescription: Fixture reviewer\n'
+            'permissions: {default: deny, allow: [read]}\n')
+
     def test_manifest_validation_and_missing_dependencies(self):
-        self.assertEqual(VALIDATOR.validate(ROOT), [])
+        self.assertEqual(VALIDATOR.validate(self.agent), [])
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            shutil.copytree(ROOT / 'schemas', root / 'schemas')
             (root / 'agent.yaml').write_text('name: test\nversion: "1.0.0"\ndescription: test\n'
                                            'skills: [missing]\nagents: {missing: {}}\n')
             errors = VALIDATOR.validate(root)
@@ -33,7 +45,8 @@ class GovernanceTests(unittest.TestCase):
             self.assertTrue(any('typo' in error for error in errors))
 
     def hook(self, payload):
-        result = subprocess.run([sys.executable, str(ROOT / 'hooks/scripts/enforce-policy.py')],
+        result = subprocess.run([sys.executable, str(SKILL / 'scripts/enforce-policy.py'),
+                                 '--agent-dir', str(self.agent)],
                                 input=json.dumps(payload), text=True,
                                 capture_output=True, timeout=10)
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -50,11 +63,11 @@ class GovernanceTests(unittest.TestCase):
             self.assertEqual(VALIDATOR.validate_skills(root), [])
 
     def test_hook_allows_reads_but_blocks_ask_unknown_and_malformed(self):
-        for agent, tool, expected in [('my-agent', 'read', 'allow'),
-                                      ('my-agent', 'cli', 'block'),
-                                      ('security-reviewer', 'write', 'block'),
+        for agent, tool, expected in [('fixture-agent', 'read', 'allow'),
+                                      ('fixture-agent', 'cli', 'block'),
+                                      ('reviewer', 'write', 'block'),
                                       ('unknown', 'read', 'block'),
-                                      ('my-agent', 'unknown', 'block')]:
+                                      ('fixture-agent', 'unknown', 'block')]:
             with self.subTest(agent=agent, tool=tool):
                 result = self.hook({'event': 'pre_tool_use', 'data': {'tool_name': tool},
                                     'session': {'agent': agent}})
@@ -63,8 +76,8 @@ class GovernanceTests(unittest.TestCase):
         self.assertEqual(self.hook({})['action'], 'block')
         self.assertEqual(self.hook([])['action'], 'block')
         self.assertEqual(self.hook({'event': 'pre_tool_use', 'data': None})['action'], 'block')
-        for target, action in [('security-reviewer', 'allow'), ('unknown', 'block')]:
-            result = self.hook({'event': 'pre_tool_use', 'session': {'agent': 'my-agent'},
+        for target, action in [('reviewer', 'allow'), ('unknown', 'block')]:
+            result = self.hook({'event': 'pre_tool_use', 'session': {'agent': 'fixture-agent'},
                                 'data': {'tool_name': 'subagent', 'arguments': {'agent': target}}})
             self.assertEqual(result['action'], action)
             self.assertTrue(result['reason'])
@@ -74,7 +87,7 @@ class GovernanceTests(unittest.TestCase):
             root = Path(directory)
             (root / 'concept.md').write_text('---\ntype: Novel Type\ncustom: retained\n---\nText\n')
             (root / 'log.md').write_text('---\ntype: Invalid Log\n---\n')
-            command = [sys.executable, str(ROOT / 'skills/gitagent/bin/okf'),
+            command = [sys.executable, str(SKILL / 'bin/okf'),
                        '--root', directory, 'validate']
             result = subprocess.run(command, capture_output=True, text=True, timeout=10)
             self.assertEqual(result.returncode, 1)

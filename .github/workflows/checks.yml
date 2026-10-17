@@ -21,9 +21,10 @@ jobs:
         with:
           node-version: '22.22.0'
           cache: npm
-      - run: python -m pip install -r requirements-dev.txt
-      - run: npm ci
+          cache-dependency-path: skills/gitagent/package-lock.json
+      - run: python -m pip install -r skills/gitagent/requirements-dev.txt
+      - run: npm ci --prefix skills/gitagent
       - name: Check portable tooling and agent content
         run: make lint test-tooling test-agent validate doctor
       - name: Validate native Promptfoo configuration (no model calls)
-        run: npm run eval:validate
+        run: make eval-validate

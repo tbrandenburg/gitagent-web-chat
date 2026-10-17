@@ -101,7 +101,7 @@ No tools, external services, or approval gates are needed beyond the model.
 The flow is defined by `steps:` in
 [workflows/echo-chain.yaml](workflows/echo-chain.yaml). Each entry names a skill
 and a prompt; results from earlier steps are appended to later prompts.
-Check the configuration offline with `python3 -m unittest tests.test_echo_flow`
+Check the configuration offline with `python3 -m unittest discover -s evals/tests -p test_echo_flow.py`
 (or `make test`). That test checks definitions and ordering, **not** actual
 model responses. This sample is not exported as an executable OpenCode V2 flow.
 
@@ -121,7 +121,7 @@ After editing knowledge or agent instructions, run **`make refresh`**. It
 validates the selected knowledge bundle, restarts GitAgent, and refreshes
 OpenCode's copied knowledge, identity, rules, manifest, and skills before
 re-exporting its configuration. It starts either runtime if its container is
-missing, so it requires an API key and host-side Python with PyYAML.
+missing, so it requires an API key and host-side Python with PyYAML and jsonschema.
 It does not copy arbitrary OpenCode workspace files.
 
 ### Use another agent folder
@@ -239,6 +239,8 @@ retain stale root tooling. Save OpenCode workspace edits and needed runtime hist
 first, then deliberately recreate the affected container using `make down` /
 `make up` or `make down-opencode` / `make up-opencode`. Removal discards container
 sessions and workspace data; the relocation does not remove containers automatically.
+Containers also retain their original startup command. Older OpenCode containers
+need deliberate recreation to adopt the new nested-dependency copy exclusions.
 
 ### What persists?
 
@@ -402,14 +404,14 @@ Offline checks require Bash, Make, **Python 3.12**, **Node.js 22.22+**,
 in your active Python environment (use `uv pip install` if pip is unavailable):
 
 ```sh
-python3 -m pip install -r requirements-dev.txt
-npm ci
+python3 -m pip install -r skills/gitagent/requirements-dev.txt
+npm ci --prefix skills/gitagent
 make lint test validate doctor
-npm run eval:validate
+make eval-validate
 ```
 
 CI uses Node.js 22.22.0 / npm 10.9.4. Generate lockfile updates with npm 10.9.4
-(or `npx --yes npm@10.9.4 install --package-lock-only`); newer npm releases can
+(or `npx --yes npm@10.9.4 install --prefix skills/gitagent --package-lock-only`); newer npm releases can
 emit a transitive dependency layout that this CI installer rejects. A clean
 Node 22.22.0 container install is the compatibility check for toolchain updates.
 
@@ -422,7 +424,7 @@ configuration. Offline checks need no Docker or API credentials.
 agent-independent fixtures. `make test-agent` checks this agent's manifest,
 knowledge, and echo flow. `make test` runs both. Portability tests execute a
 copied skill from paths containing spaces against an unrelated minimal agent.
-The production live scenario stays in [tests/live-production.mjs](tests/live-production.mjs)
+The production live scenario stays in [evals/tests/live-production.mjs](evals/tests/live-production.mjs)
 and plugs into the skill's shared live-chat harness rather than being packaged
 as generic runtime behavior. The management skill is visible alongside domain
 skills when exporting an agent; its host-only lifecycle instructions do not
@@ -451,21 +453,18 @@ gitagent-web-chat/
 ├── SOUL.md / RULES.md / DUTIES.md # Identity, behavior, responsibilities
 ├── AGENTS.md                     # Cross-platform contributor instructions
 ├── README.md / LICENSE / .gitignore
-├── schemas/
-│   ├── agent.schema.json         # Pinned OpenGAP fork, extended for permissions
-│   ├── hooks.schema.json         # Pinned upstream hook configuration contract
-│   ├── memory.schema.json        # Pinned upstream memory configuration contract
-│   └── UPSTREAM.md               # Source revision, extensions, runtime caveats
 ├── agents/security-reviewer/
 │   ├── agent.yaml                # Independent model, read-only permissions
 │   └── SOUL.md / RULES.md / DUTIES.md
 ├── skills/
 │   ├── gitagent/                 # Portable host-side management and evaluation
 │   │   ├── SKILL.md / Makefile / LICENSE
+│   │   ├── package.json / package-lock.json # Pinned Promptfoo tooling
+│   │   ├── requirements-dev.txt  # Pinned Python validation dependencies
 │   │   ├── bin/                  # Exporter, permission adapter, OKF, eval runner
-│   │   ├── scripts/              # GitAgent and OpenCode Docker launchers
+│   │   ├── scripts/              # Launchers, validators, diagnostics, provider, policy
 │   │   ├── references/           # Runtime and evaluation instructions
-│   │   ├── assets/               # Environment template
+│   │   ├── assets/               # Environment template and pinned schemas/
 │   │   └── tests/                # Agent-independent tooling and live harnesses
 │   ├── okf-knowledge/SKILL.md     # Progressive knowledge retrieval
 │   ├── code-review/SKILL.md      # Evidence-based review and explicit delegation
@@ -481,29 +480,24 @@ gitagent-web-chat/
 │   ├── index.md / log.md / MEMORY.md
 │   ├── memory.yaml               # Native GitAgent config, not an OKF concept
 │   └── lessons/                  # Draft lesson with its navigation index
-├── hooks/
-│   ├── hooks.yaml                # OpenGAP pre_tool_use binding
-│   └── scripts/enforce-policy.py # Fail-closed JSON hook implementation
+├── hooks/hooks.yaml              # Native binding to the skill's policy script
 ├── evals/
 │   ├── promptfooconfig.yaml      # Native Promptfoo config and published schema
 │   ├── cases/                    # SQL injection, production, delegation, policy
 │   ├── assertions/               # Actual tool-event and side-effect checks
+│   ├── tests/                    # Agent regressions and production live scenario
 │   └── results/                  # Generated output, ignored
-├── scripts/
-│   ├── doctor.sh                 # Offline diagnostics without secret reads
-│   ├── validate-manifests.py     # Pinned schema and dependency checks
-│   ├── validate-okf.py           # Check knowledge and memory independently
-│   └── promptfoo_gitagent.py     # Native Python provider using the skill runner
-├── tests/                        # Agent regressions and production live scenario
 ├── .github/workflows/
 │   ├── checks.yml                # Offline governance on PRs and main
 │   └── agent-evals.yml           # Explicit manual live-evaluation workflow
-├── Makefile                      # Runtime delegation and agent governance
-├── requirements-dev.txt          # Pinned Python validation dependencies
-└── package.json / package-lock.json # Pinned Promptfoo toolchain
+└── Makefile                      # Thin delegation and agent-owned test entry points
 ```
 
-Ignored local state may also include `.gitagent/`, `workspace/`, `.promptfoo/`,
+Reusable tooling and its dependencies stay inside `skills/gitagent/`; the root
+contains agent content and repository essentials. A regression test rejects
+unexpected tracked or non-ignored root entries.
+
+Ignored local state may also include `.gitagent/`, `workspace/`,
 `memory/runtime/`, and `memory/archive/`. Legacy non-OKF journals can be retained
 under `.gitagent/legacy-memory-journal/` rather than published as curated memory.
 The pinned voice server's automatic raw journals are redirected to
@@ -537,8 +531,8 @@ delegation is exercised through a real child invocation, not by impersonating
 a subagent with a different prompt.
 
 ```sh
-npm ci
-npm run eval:validate             # Offline; no agent invocation
+npm ci --prefix skills/gitagent
+make eval-validate                # Offline; no agent invocation
 make up-opencode                  # Needs inherited OPENAI_API_KEY
 # After instruction/manifest edits, refresh the selected existing runtime:
 bash skills/gitagent/scripts/opencode-web.sh refresh "$PWD"
@@ -569,10 +563,10 @@ the config; they do not prove model behavior.
 | Permissions | Manifest `permissions` | Native OpenCode V2 rules exported by the skill |
 | Hook protocol | `hooks/` | Tested JSON pre-tool policy; requires a hook-capable host |
 | Evaluations | `evals/` | Native Promptfoo validation and optional live runs |
-| Governance | `.github/workflows/`, `schemas/` | Offline CI and separately triggered live CI |
+| Governance | `.github/workflows/`, `skills/gitagent/assets/schemas/` | Offline CI and separately triggered live CI |
 
 The permissions block is a **local OpenGAP extension**, documented in
-[schemas/UPSTREAM.md](schemas/UPSTREAM.md). Use `make validate`, not upstream
+[schema provenance](skills/gitagent/assets/schemas/UPSTREAM.md). Use `make validate`, not upstream
 `opengap validate`, to enforce it. The main agent asks before shell/edit actions;
 non-interactive evaluations reject those requests. The read-only child has its
 own deny-default policy. Code Mode is enabled for the main agent so permitted

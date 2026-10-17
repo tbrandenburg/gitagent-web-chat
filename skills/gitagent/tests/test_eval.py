@@ -9,9 +9,21 @@ BASE = Path(__file__).resolve().parents[1]
 SPEC = importlib.util.spec_from_file_location('runner', BASE / 'bin/run-eval.py')
 RUNNER = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(RUNNER)
+PROVIDER_SPEC = importlib.util.spec_from_file_location('provider', BASE / 'scripts/promptfoo_gitagent.py')
+PROVIDER = importlib.util.module_from_spec(PROVIDER_SPEC)
+PROVIDER_SPEC.loader.exec_module(PROVIDER)
 
 
 class EvalTests(unittest.TestCase):
+    def test_provider_rejects_invalid_selection_and_path_checks_before_invocation(self):
+        for config in ({'agent_path': 'relative'},
+                       {'agent_path': '/nonexistent-agent', 'absent_paths': ['../escape']},
+                       {'agent_path': '/nonexistent-agent', 'absent_paths': '/workspace/file'}):
+            with self.subTest(config=config):
+                result = PROVIDER.call_api('hello', {'config': config}, {})
+                self.assertEqual(result['error'], 'Agent evaluation failed: ValueError')
+                self.assertNotIn('output', result)
+
     def test_json_events_keep_text_and_actual_tool_evidence(self):
         events = [
             {'type': 'step_start'},

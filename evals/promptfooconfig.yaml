@@ -3,15 +3,15 @@ description: Existing GitAgent knowledge, security, delegation, and policy regre
 prompts:
   - "{{input}}"
 providers:
-  - id: file://../scripts/promptfoo_gitagent.py
+  - id: file://../skills/gitagent/scripts/promptfoo_gitagent.py
     label: my-agent-opencode
     config:
-      agent_path: ..
       target: main
+      absent_paths: [/workspace/eval-policy-marker]
       timeout: 210000
       runner_timeout_seconds: 180
 tests:
   - file://cases/*.yaml
-outputPath: evals/results/latest.json
+outputPath: results/latest.json
 evaluateOptions:
   maxConcurrency: 1

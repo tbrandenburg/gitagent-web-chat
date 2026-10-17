@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 """OpenGAP pre_tool_use JSON protocol; ask is blocked without an approval UI."""
+import argparse
 import json
 from pathlib import Path
 import sys
 
 import yaml
 
-ROOT = Path(__file__).resolve().parents[2]
 ALIASES = {'cli': 'shell', 'write': 'edit', 'memory': 'edit'}
 
 
-def decision(payload: dict) -> dict:
+def decision(payload: dict, directory: Path) -> dict:
     if not isinstance(payload, dict):
         raise ValueError('Expected object')
     if payload.get('event') != 'pre_tool_use':
@@ -21,11 +21,11 @@ def decision(payload: dict) -> dict:
     name = payload['session']['agent']
     if not isinstance(tool, str) or not isinstance(name, str):
         raise ValueError('Expected tool and agent names')
-    root = yaml.safe_load((ROOT / 'agent.yaml').read_text())
+    root = yaml.safe_load((directory / 'agent.yaml').read_text())
     if name == root['name']:
         manifest = root
     elif name in root.get('agents', {}) and '/' not in name and '..' not in name:
-        manifest = yaml.safe_load((ROOT / 'agents' / name / 'agent.yaml').read_text())
+        manifest = yaml.safe_load((directory / 'agents' / name / 'agent.yaml').read_text())
     else:
         raise ValueError('Unknown agent')
     policy = manifest.get('permissions', {'default': 'deny'})
@@ -45,8 +45,11 @@ def decision(payload: dict) -> dict:
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--agent-dir', type=Path, default=Path.cwd())
+    args = parser.parse_args()
     try:
-        result = decision(json.load(sys.stdin))
+        result = decision(json.load(sys.stdin), args.agent_dir.resolve())
     except (OSError, ValueError, KeyError, TypeError, yaml.YAMLError):
         result = {'action': 'block', 'reason': 'Invalid policy input or configuration'}
     print(json.dumps(result))

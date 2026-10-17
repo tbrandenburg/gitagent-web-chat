@@ -5,7 +5,7 @@ import unittest
 
 import yaml
 
-BASE = Path(__file__).resolve().parents[1]
+BASE = Path(__file__).resolve().parents[2]
 FLOW = BASE / "workflows" / "echo-chain.yaml"
 SKILLS = ("echo-start", "echo-middle", "echo-end")
 LABELS = ("ECHO_START:", "ECHO_MIDDLE:", "ECHO_END:")
