@@ -81,7 +81,8 @@ class VercelSmokeTests(unittest.TestCase):
                             {'VERCEL_AUTOMATION_BYPASS_SECRET': 'synthetic'}]:
             with self.subTest(keys=list(environment)), patch.dict(os.environ, environment, clear=True):
                 with self.assertRaisesRegex(ValueError, 'Supply'):
-                    smoke['check']('https://example-preview.vercel.app', Path('/missing-fixture'))
+                    smoke['check']('https://example-preview.vercel.app', Path('/missing-fixture'),
+                                   'selected-project', 'selected-scope')
                 self.assertNotIn('VERCEL_TOKEN', os.environ)
 
     def test_preview_url_rejects_credential_forwarding_destinations(self):

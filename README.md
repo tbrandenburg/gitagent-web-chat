@@ -441,10 +441,15 @@ The [preview staging helper](/skills/gitagent/scripts/prepare-opencode-preview.p
 copies tracked curated inputs outside the repository and generates root Docker
 build artifacts from the existing pinned image source. Runtime/archive memory,
 workspace state and Docker-excluded tooling are removed **before upload**; known
-credential filenames are rejected. This is not a content-based secret detector:
-review the selected tracked source for arbitrary embedded secrets before staging.
-The smoke helper requires explicitly supplied bypass/password environment values,
-uses private curl configuration files, and never creates a bypass or changes cloud
+credential filenames are rejected. Selected inputs and packaged Docker artifacts
+must match a committed Git HEAD, including staged and working-tree bytes; excluded
+state and unrelated host documentation may remain dirty. This is not a content-based
+secret detector: review the selected tracked source for embedded secrets before staging.
+The smoke helper requires explicit `--project` and `--scope`, authenticated Vercel
+CLI read-only API access, and supplied bypass/password environment values. Before
+preparing credential-bearing requests, it verifies the exact canonical host belongs
+to that project, is READY Preview, and has All Deployments protection. It uses
+private curl configuration files and never creates a bypass or changes cloud
 settings. Vercel's nested Dockerfile
 build used the wrong context; local Docker behavior is unchanged. See
 [cloud evidence and reproduction](/skills/gitagent/references/runtime-management.md#protected-hobby-preview-issue-13)

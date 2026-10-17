@@ -353,8 +353,17 @@ Prepare only; this command performs no cloud operations:
 python3 skills/gitagent/scripts/prepare-opencode-preview.py --output /tmp/opencode-preview
 ```
 
-Use a new/empty external output directory. Untracked inputs are deliberately not
-uploaded; review the source's tracked inputs before preparing a deployment. The
+Use a new/empty external output directory. The selected repository must have a
+committed HEAD. Selected tracked inputs must match HEAD in both index and working
+tree (including additions, deletions, renames and edits hidden by index flags).
+Packaged Docker artifacts must also match their own repository's HEAD, even when
+the skill is used against another agent. Dirty selected inputs fail before output
+creation; cleanliness is checked again after copying. Copied destination bytes and
+executable modes, including renamed root Docker artifacts, must match the saved
+pre-copy HEAD metadata before success. Never upload output from failed preparation.
+Excluded state and unrelated
+host documentation need not be clean. Untracked inputs are deliberately not
+uploaded; review and commit intended source changes before preparing a deployment. The
 helper mirrors the Dockerfile-specific source exclusions before copying and writes
 a `.vercelignore` as upload defense in depth. In particular, tracked
 `memory/runtime`, `memory/archive`, `evals/results`, nested workspace/cache paths,
@@ -374,15 +383,23 @@ deployment has been accounted for:
 ```sh
 vercel deploy /tmp/opencode-preview --dry --json --scope <hobby-scope> --project <project> --target preview
 vercel deploy /tmp/opencode-preview --scope <hobby-scope> --project <project> --target preview
-python3 skills/gitagent/tests/vercel-opencode-smoke.py --url <protected-preview-url> --agent-dir <selected-local-agent>
+python3 skills/gitagent/tests/vercel-opencode-smoke.py --url <protected-preview-url> --project <expected-project> --scope <expected-scope> --agent-dir <selected-local-agent>
 ```
 
 The opt-in smoke test needs the matching strong `OPENCODE_SERVER_PASSWORD` and
 an explicitly supplied existing `VERCEL_AUTOMATION_BYPASS_SECRET` in the environment.
 Missing values fail before network access. Use the exact selected Preview's
 `https://<deployment>.vercel.app` URL, without userinfo, path, query or fragment;
-the helper does not establish whether a URL is Preview, so verify that target
-independently before supplying credentials. No authenticated Vercel CLI is needed.
+an authenticated Vercel CLI session (or normal CLI token environment) is required.
+Before creating runtime auth configs or sending HTTP requests, scoped read-only
+`vercel api` GETs resolve the explicitly selected project and deployment. The
+project ID must equal deployment `projectId`, its canonical `url` must exactly
+match the supplied host, `readyState` must be READY, `target` explicitly null, and
+the project's `ssoProtection.deploymentType` must be `all`. Aliases, unrelated
+projects, non-Preview/unready deployments and API failures fail closed. Runtime
+password/bypass variables and `OPENAI_API_KEY` are removed from the CLI child environment;
+CLI diagnostics are captured and suppressed. Normal Vercel authentication is kept.
+Security gates remain active under `python -O` and `PYTHONOPTIMIZE=1`.
 It sends **no model prompts or shell/write tools**. Direct curl reads the bypass
 header and Basic credentials only from temporary mode-0600 config files inside a
 mode-0700 directory, removed after use; neither credential enters child argv or
@@ -449,6 +466,14 @@ with test credentials piped privately on stdin and no trace/HAR recording.
 Screenshots were inspected under ignored `.playwright-mcp/issue13-*.png`;
 the private temporary credential file was removed afterward. The checked-in
 no-inference HTTP smoke was rerun successfully against this deployment.
+
+The subsequent PR #17 identity/clean-HEAD/optimization review fixes passed 98
+offline tests, including optimized-Python negative cases and real Git/curl
+fixtures. A fresh coordinator-run read-only identity check passed against this
+Preview and rejected an unrelated Vercel hostname without runtime credential
+transport. The actual modified working tree was rejected before upload-directory
+creation. The complete credential-bearing smoke was not rerun after these fixes;
+no deployment or credential rotation was performed for this review follow-up.
 
 ### Limits, rollback and research-only alternatives
 

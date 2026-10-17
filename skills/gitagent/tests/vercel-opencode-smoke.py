@@ -12,6 +12,12 @@ import time
 import urllib.parse
 
 import yaml
+from vercel_identity import verify_preview
+
+
+def require(condition: object, message: str) -> None:
+    if not condition:
+        raise AssertionError(message)
 
 
 def preview_url(base: str) -> str:
@@ -25,12 +31,16 @@ def preview_url(base: str) -> str:
     return base.rstrip('/')
 
 
-@contextmanager
-def credentials(password: str, bypass: str):
+def validate_credentials(password: str, bypass: str) -> None:
     if not password or password == 'password' or not bypass:
         raise ValueError('Supply OPENCODE_SERVER_PASSWORD and VERCEL_AUTOMATION_BYPASS_SECRET')
     if any(ord(character) < 32 or ord(character) == 127 for character in password + bypass):
         raise ValueError('Credential control characters are not supported')
+
+
+@contextmanager
+def credentials(password: str, bypass: str):
+    validate_credentials(password, bypass)
     def quoted(value: str) -> str:
         return '"' + value.replace('\\', '\\\\').replace('"', '\\"') + '"'
 
@@ -84,27 +94,29 @@ def local_rules(agent: Path) -> dict:
 
 
 def verify_config(configdata: dict, expected: dict) -> None:
-    assert configdata['default_agent'] == 'gitagent-main'
-    assert set(configdata['agents']) == set(expected), 'Deployed agent IDs differ from local manifests'
+    require(configdata['default_agent'] == 'gitagent-main', 'Deployed default agent differs')
+    require(set(configdata['agents']) == set(expected), 'Deployed agent IDs differ from local manifests')
     for identifier, rules in expected.items():
-        assert configdata['agents'][identifier]['permissions'] == rules, 'Deployed permission drift'
+        require(configdata['agents'][identifier]['permissions'] == rules, 'Deployed permission drift')
 
 
 def verify_registration(agents: list, expected: dict) -> None:
     for identifier, rules in expected.items():
         matches = [item for item in agents if item['id'] == identifier]
-        assert len(matches) == 1, 'Expected exactly one native registration per local agent'
+        require(len(matches) == 1, 'Expected exactly one native registration per local agent')
         native = matches[0]['permissions']
         starts = [index for index in range(len(native) + 1)
                   if native[index:index + len(rules)] == rules
                   and all(rule['effect'] == 'deny' for rule in native[index + len(rules):])]
-        assert starts, 'Ordered local native permissions missing or trailing non-deny drift'
+        require(starts, 'Ordered local native permissions missing or trailing non-deny drift')
 
 
-def check(base: str, agent: Path) -> None:
+def check(base: str, agent: Path, project: str, scope: str) -> None:
     base = preview_url(base)
     password = os.environ.get('OPENCODE_SERVER_PASSWORD', '')
     bypass = os.environ.get('VERCEL_AUTOMATION_BYPASS_SECRET', '')
+    validate_credentials(password, bypass)
+    verify_preview(base, project, scope)
     location = '?' + urllib.parse.urlencode({'location[directory]': '/tmp/workspace'})
     with credentials(password, bypass) as configs:
         expected = local_rules(agent)
@@ -112,28 +124,28 @@ def check(base: str, agent: Path) -> None:
             return request(base, path, configs[0 if auth else 1], seconds)
 
         page, status = protected('/')
-        assert status == 200 and 'OpenCode' in page, 'Expected upstream UI'
+        require(status == 200 and 'OpenCode' in page, 'Expected upstream UI')
         match = re.search(r'(?:src|href)="(/_assets/[^" ]+\.js)"', page)
-        assert match, 'Expected bundled upstream asset'
+        require(match, 'Expected bundled upstream asset')
         javascript, status = protected(match.group(1))
-        assert status == 200 and len(javascript) > 100
+        require(status == 200 and len(javascript) > 100, 'Expected upstream JavaScript')
         _, status = protected('/api/info', auth=False)
-        assert status == 401, 'Missing Basic authentication must fail behind Vercel protection'
+        require(status == 401, 'Missing Basic authentication must fail behind Vercel protection')
         _, status = protected('/api/info')
-        assert status == 200, 'Correct Basic authentication must succeed'
+        require(status == 200, 'Correct Basic authentication must succeed')
         for path in ['/', match.group(1), '/api/info', '/api/event', '/api/pty']:
             _, status = request(base, path, seconds=30)
-            assert status == 302, 'Signed-out request was not challenged'
+            require(status == 302, 'Signed-out request was not challenged')
         print('Signed-out UI/real asset/API/SSE/PTY challenged; protected UI/assets/Basic auth passed.', flush=True)
 
         exported, status = protected('/api/fs/read/opencode.json' + location)
-        assert status == 200, 'Generated workspace configuration missing'
+        require(status == 200, 'Generated workspace configuration missing')
         configdata = json.loads(exported)
         verify_config(configdata, expected)
         identifiers = set(expected)
         for attempt in range(45):
             body, status = protected('/api/agent' + location)
-            assert status == 200
+            require(status == 200, 'Native agent registration request failed')
             agents = json.loads(body)['data']
             if identifiers <= {item['id'] for item in agents}:
                 break
@@ -143,18 +155,20 @@ def check(base: str, agent: Path) -> None:
         verify_registration(agents, expected)
         knowledge = 'knowledge/index.md'
         content, status = protected('/api/fs/read/' + knowledge + location)
-        assert status == 200 and content == (agent / knowledge).read_text()
+        require(status == 200 and content == (agent / knowledge).read_text(), 'Deployed knowledge drift')
         stream, status = protected('/api/event', seconds=5)
-        assert status == 200 and 'server.connected' in stream
+        require(status == 200 and 'server.connected' in stream, 'Expected connected SSE stream')
         print('Generated workspace, ordered native main/child rules, source-identical OKF and real SSE verified; no model call.', flush=True)
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--url', required=True)
+    parser.add_argument('--project', required=True)
+    parser.add_argument('--scope', required=True)
     parser.add_argument('--agent-dir', type=Path, default=Path.cwd())
     options = parser.parse_args()
     try:
-        check(options.url, options.agent_dir)
-    except (ValueError, OSError, subprocess.SubprocessError, RuntimeError, AssertionError):
-        parser.exit(1, 'Preview smoke failed; verify URL, explicit secrets and local/deployed policy.\n')
+        check(options.url, options.agent_dir, options.project, options.scope)
+    except (ValueError, OSError, subprocess.SubprocessError, RuntimeError, AssertionError) as error:
+        parser.exit(1, f'Preview smoke failed: {error}\n')

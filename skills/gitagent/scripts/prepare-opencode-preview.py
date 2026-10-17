@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Prepare a temporary Vercel Docker context; never creates cloud resources."""
 import argparse
+from collections.abc import Callable
 from fnmatch import fnmatchcase
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -30,6 +32,47 @@ def excluded(name: Path) -> bool:
             or name.name == '.env.example')
 
 
+def git(root: Path, *arguments: str, content: bytes | None = None) -> bytes:
+    environment = {key: value for key, value in os.environ.items() if not key.startswith('GIT_')}
+    result = subprocess.run(['git', *arguments], cwd=root, input=content,
+                            capture_output=True, timeout=15, env=environment)
+    if result.returncode:
+        raise ValueError('Source requires a readable Git HEAD; diagnostics suppressed')
+    return result.stdout
+
+
+def verify_blob(root: Path, path: Path, metadata: tuple[str, str, str], message: str) -> None:
+    mode, kind, digest = metadata
+    if path.is_symlink() or kind != 'blob' or not path.is_file():
+        raise ValueError(message)
+    actual = git(root, 'hash-object', '--stdin', content=path.read_bytes()).decode().strip()
+    executable = bool(path.stat().st_mode & 0o111)
+    if actual != digest or executable != (mode == '100755'):
+        raise ValueError(message)
+
+
+def clean_sources(root: Path, selected: Callable[[Path], bool]) -> dict[Path, tuple[str, str, str]]:
+    entries = git(root, 'ls-tree', '-rz', 'HEAD', '--', '.').decode().split('\0')
+    committed = {}
+    for entry in filter(None, entries):
+        metadata, name = entry.split('\t', 1)
+        mode, kind, digest = metadata.split()
+        if selected(Path(name)):
+            committed[Path(name)] = (mode, kind, digest)
+    indexed = {Path(name) for name in git(root, 'ls-files', '--cached', '-z').decode().split('\0')
+               if name and selected(Path(name))}
+    staged = git(root, 'diff', '--relative', '--cached', '--name-only', '--no-renames', '-z', 'HEAD').decode()
+    if indexed != set(committed) or any(selected(Path(name)) for name in staged.split('\0') if name):
+        raise ValueError('Selected tracked inputs must be clean against HEAD (including staged edits)')
+    for name, metadata in committed.items():
+        path = root / name
+        if path.is_symlink() or any(parent.is_symlink() for parent in path.parents if parent != root):
+            raise ValueError('Symlink source rejected')
+        # Compare bytes directly: index flags can hide edits from git status/diff.
+        verify_blob(root, path, metadata, 'Selected tracked inputs must be clean against HEAD')
+    return committed
+
+
 def prepare(agent: Path, output: Path) -> int:
     agent = agent.resolve()
     output = output.resolve()
@@ -39,9 +82,7 @@ def prepare(agent: Path, output: Path) -> int:
         raise ValueError('Output must be outside the source repository')
     if output.exists() and (not output.is_dir() or any(output.iterdir())):
         raise ValueError('Output must be a new or empty directory')
-    result = subprocess.run(['git', 'ls-files', '--cached', '-z'], cwd=agent,
-                            capture_output=True, text=True, timeout=15, check=True)
-    names = [Path(name) for name in result.stdout.split('\0')
+    names = [Path(name) for name in git(agent, 'ls-files', '--cached', '-z').decode().split('\0')
              if name and Path(name).parts[0] in INPUTS]
     sources = [name for name in names if not excluded(name)]
     for name in sources:
@@ -57,17 +98,30 @@ def prepare(agent: Path, output: Path) -> int:
             raise ValueError('Symlink source rejected')
         if not path.is_file():
             raise ValueError('Tracked source file is missing')
+    selected = lambda name: name.parts[0] in INPUTS and not excluded(name)
+    sources = clean_sources(agent, selected)
+    assets = SKILL / 'assets'
+    artifacts = {'Dockerfile.feasibility', 'Dockerfile.feasibility.dockerignore'}
+    packaged = clean_sources(assets, lambda name: name.as_posix() in artifacts)
+    if len(packaged) != 2:
+        raise ValueError('Packaged Docker artifacts must exist in Git HEAD')
     output.mkdir(parents=True, exist_ok=True)
     for name in sources:
         target = output / name
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(agent / name, target)
     # Vercel uses the Dockerfile directory as context, even with Services root=".".
-    assets = SKILL / 'assets'
     shutil.copy2(assets / 'Dockerfile.feasibility', output / 'Dockerfile.vercel')
     shutil.copy2(assets / 'Dockerfile.feasibility.dockerignore',
                  output / 'Dockerfile.vercel.dockerignore')
     (output / '.vercelignore').write_text(UPLOAD_IGNORE)
+    clean_sources(agent, selected)
+    clean_sources(assets, lambda name: name.as_posix() in artifacts)
+    for name, metadata in sources.items():
+        verify_blob(agent, output / name, metadata, 'Copied input differs from verified HEAD')
+    for name, metadata in packaged.items():
+        target = output / name.name.replace('Dockerfile.feasibility', 'Dockerfile.vercel', 1)
+        verify_blob(assets, target, metadata, 'Copied Docker artifact differs from verified HEAD')
     return len(sources)
 
 
