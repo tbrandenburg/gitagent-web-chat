@@ -120,7 +120,7 @@ export async function start({ port, directory = process.cwd(), command = ['openc
   }
 }
 
-async function ready({ internal, directory, expected, authorization, pid, signal }) {
+export async function ready({ internal, directory, expected, authorization, pid, signal }) {
   const origin = `http://127.0.0.1:${internal}`;
   const query = `?${new URLSearchParams({ 'location[directory]': directory })}`;
   const probe = async path => {

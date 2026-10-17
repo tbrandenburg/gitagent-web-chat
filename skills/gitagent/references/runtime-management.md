@@ -10,6 +10,7 @@
 - [Checks and troubleshooting](#checks-and-troubleshooting)
 - [Local container feasibility](#local-container-feasibility)
 - [Protected Hobby preview](#protected-hobby-preview-issue-13)
+- [Retained named Sandbox follow-up](#retained-named-sandbox-follow-up)
 
 ## Invocation and ownership
 
@@ -688,3 +689,195 @@ was added.
 | Docker Function (retained) | Pinned upstream UI/exporter/native permissions passed protected cloud probes; ephemeral Function lifetime and genuine-chat gates remain. |
 | npm Node.js Function | [Handlers and Node servers](https://vercel.com/docs/functions/runtimes/node-js) are supported, but npm installation alone does not adapt this standalone CLI/UI/API/SSE; binary tracing/lifecycle and root layout need proof. No proxy or alternative implemented. |
 | npm in Sandbox | [Official OpenCode guide](https://vercel.com/kb/guide/running-opencode-securely-with-the-vercel-sandbox) is a different MicroVM lifecycle with unpinned installer and different config. [Hobby](https://vercel.com/docs/sandbox/pricing#hobby) includes 5 CPU-hours, 420 GB-hours, 5,000 creations and 20 GB transfer/month, 15 GB lifetime snapshots, 45-minute sessions, no overage charges. Sandbox URL auth needs separate verification. [Snapshots](https://vercel.com/docs/sandbox/concepts/snapshots) persist filesystem checkpoints, not running streams or verified SQLite conversation recovery. Separate approval required; no sandbox created. |
+
+## Retained named Sandbox follow-up
+
+This separately approved follow-up does not replace the Function or localhost
+launchers. Use the existing Dockerfile's optional target from repository root:
+
+```sh
+docker build --target opencode-sandbox -t opencode-sandbox:issue13 -f skills/gitagent/assets/Dockerfile.feasibility .
+python3 skills/gitagent/tests/sandbox-smoke.py
+python3 skills/gitagent/tests/container-image-audit.py opencode-sandbox:issue13
+```
+
+The default/final target remains `opencode`; `gitagent` is unchanged. No new npm
+dependency or pin is introduced. The native PTY helper extracts a shared library
+under `/tmp`, which must permit executable mappings (the Docker test uses `exec`).
+The smoke test needs installed skill test dependencies for its existing `ws`
+package, but supplies neither model credentials nor prompts. It owns temporary
+containers/volume and binds a random localhost port; shared runtimes are not used.
+
+### Operator commands
+
+Require authenticated Vercel CLI (tested interface: 64.5.0), host Python 3.12 and
+explicit active Hobby **scope slug**, protected existing project, stable name and
+full owner/project/repository digest. Publishing the optional image to VCR is a
+separate approved operator action. The unchanged preview preparer still requires
+committed, clean selected source; never upload a failed or dirty staging output.
+Set a strong `OPENCODE_SERVER_PASSWORD` privately in the caller environment
+(32+ non-whitespace characters), not argv, shell history or a repository file.
+
+```sh
+python3 skills/gitagent/scripts/opencode-sandbox.py start --scope <hobby-scope> --project <project> --name <stable-name> --image <scope>/<project>/<repository>@sha256:<digest>
+python3 skills/gitagent/scripts/opencode-sandbox.py status --scope <hobby-scope> --project <project> --name <stable-name> --image <scope>/<project>/<repository>@sha256:<digest>
+python3 skills/gitagent/scripts/opencode-sandbox.py stop --scope <hobby-scope> --project <project> --name <stable-name> --image <scope>/<project>/<repository>@sha256:<digest>
+python3 skills/gitagent/scripts/opencode-sandbox.py resume --scope <hobby-scope> --project <project> --name <stable-name> --image <scope>/<project>/<repository>@sha256:<digest>
+```
+
+`start` creates only if absent; `resume` never creates. Existing names require
+matching project/session/image/managed marker and bounded resources/retention.
+Absent/expired snapshots and unfamiliar state fail closed; no `getOrCreate`
+expiry-replacement behavior, fork or delete is used. Start/resume waits up to
+90 seconds for the verified session to transition from pending to running before
+launch or credential transport. Each lifecycle read revalidates ownership and
+the same session ID; failed/aborted or stopping/snapshotting states cannot admit
+traffic. This is bounded operator polling, not an always-on resume service.
+`status` and stopped `stop` do not wake a VM or transport runtime credentials.
+Status reports both logical Sandbox and actual session state, including transient
+states. Stop withdraws ingress first, attempts owned graceful shutdown when running,
+then requests platform stop even if the helper fails. The platform request sends
+an empty JSON object through CLI stdin to select the required `application/json`
+content type, despite having no request fields. Stop verifies stopped state and
+the created, non-expiring snapshot's exact source session; a helper failure returns
+`gracefulShutdownFailed: true`, not a claim of graceful success. Platform stop or
+snapshot verification failure remains an error, with retained data never deleted.
+For manual model-enabled use, stop the successfully verified model-free Sandbox,
+inherit the separately approved `OPENAI_API_KEY`, and append `--with-model` to
+`resume`. This option transports the key only to the server command, never to
+Sandbox default environment, logs, argv or browser. It does not submit a prompt.
+Model-enabled resume restricts egress to `api.openai.com` and `mcp.context7.com`;
+default bootstrap denies egress. Other providers need a separately scoped change.
+Saved `sandbox.networkPolicy` is not proof of the running VM's firewall. Resume
+patches the desired policy before boot, then verifies `session.networkPolicy`
+on the same owned session before sending credentials. If a known managed session
+still has the previous restriction, the controller uses the documented live
+`POST /v2/sandboxes/sessions/{id}/network-policy` with the flat policy object and
+re-reads identity plus saved/effective policy. Broader/unknown or ineffective
+policies fail closed; no allow-all, CIDR/DNS bypass or model-request retry is used.
+An idempotent start of an existing running VM verifies its saved and effective
+managed policies agree, without changing its policy, key or native process.
+A mismatch requires explicit operator repair; configuration alone cannot claim ready.
+
+The controller verifies exact scope/project/resource ownership on each operation.
+Start/resume additionally requires active Hobby and All Deployments protection.
+Status and stop remain available for the verified owned Sandbox after a plan,
+billing-status or protection change, so changed admission settings cannot prevent
+inspection and resource release. It requests 1 vCPU/2 GiB, a 45-minute session,
+one retained automatic snapshot with no expiry, immediate eviction deletion and no paid network/drives/
+failover. Review snapshot usage against Hobby's shared 15 GB cap; this is not a
+backup guarantee. An API failure can leave a private running VM consuming its
+capped allowance; inspect `status`, then explicitly `stop` rather than retrying
+creation blindly. The controller never upgrades plans or deletes retained state.
+
+### State and access boundary
+
+Sandbox image ENTRYPOINT/CMD is not a service lifecycle hook. The controller uses
+the official asynchronous session-command REST equivalent of SDK
+`runCommand({detached: true, env})`; JSON travels through CLI stdin and CLI child
+environments exclude runtime/model/bypass secrets.
+
+One-off command completion uses a bounded `GET .../cmd/{id}?wait=true`, accepting
+JSON or NDJSON status frames and validating final exit status/available IDs.
+Bare command GET metadata can retain its initial null exit code; it is not polled
+as completion evidence. Detached server launches do not wait, and failed or
+incomplete completion reads are not retried or counted as successful.
+
+On each boot it runs `sandbox-start.sh`: a kernel lock prevents duplicate
+supervisors without stale PID signaling. Source copy, runtime Git init and existing exporter run only on
+first successful initialization. Partial/unfamiliar state fails without overwrite.
+Workspace edits/config and HOME/XDG/native SQLite remain under the retained root;
+resume never re-exports or resets them. Environment-only model keys are not saved
+as auth files. Graceful stop checks boot ID and PID start time before signaling
+the exact owned supervisor; the supervisor owns and bounds its two child exits.
+
+Nginx starts only after the existing authenticated owned-PID API/main/child gate.
+Its server-wide `auth_basic` protects **every path**, including static UI, API,
+SSE and WS upgrades, with the same `opencode` username/password forwarded unchanged
+to native API auth. Only a salted SHA-512 password hash is written (0600, `/tmp`);
+the hashing subprocess reads plaintext on stdin. Request/error logs are disabled
+at the proxy to avoid PTY ticket URLs; supervised service failures are generic.
+Native child stdout/stderr are suppressed, not forwarded into cloud diagnostics.
+Workspace Python/export subprocesses, the password hasher and Nginx receive an
+explicit minimal runtime-path environment without provider/platform/password
+credentials. Only the native OpenCode child receives the selected server password
+and optional OpenAI key; the hasher receives its password only through stdin.
+The native server binds loopback 4096; only gateway 8080 can be exposed. Creation
+starts with no ports; private missing/wrong/correct-password checks precede route
+publication, followed by authoritative route identity and HTTPS checks. Admission
+failure withdraws the gateway port without deleting data.
+
+Open the verified HTTPS URL and use browser Basic auth with username `opencode`.
+If the native UI asks for a password, use the same value. Select
+`/var/tmp/gitagent-opencode/workspace`; in pinned UI 2.0.28 enable **Show agent**,
+leave automatic permission approval **off**, and explicitly select `gitagent-main`.
+Confirm actual session/reply agent IDs before manual inference. Exported permissions
+remain native OpenCode permissions; the GitAgent browser limitation is unchanged.
+
+### Manual cloud acceptance evidence
+
+Verified at host UTC `2026-10-17T22:06:28+00:00`, separately from the Function
+preview. The owner-approved retained Sandbox is `gitagent-opencode-persistent`;
+its immutable image was built from committed `aa05329` runtime source, using
+OpenCode `2.0.28`, OpenGAP `0.5.0` and the existing exporter. Later changes affect
+the host controller's API contracts only; the running runtime files are unchanged.
+
+| Check | Observed result |
+| --- | --- |
+| Independent ingress protection | Missing/wrong Basic credentials returned 401 on root, a real bundled asset, info, SSE and PTY paths; actual unauthenticated WebSocket upgrade returned 401. Correct credentials loaded native UI/assets/API; fresh Chromium reported zero page errors. |
+| Genuine conversation retention | Native session `ses_eb431b33dffeEdXfTccNCNjofC` survived explicit VM stop, automatic snapshot and named resume into a different Vercel session. A fresh browser reopened it; the next main-agent reply recalled the reference token without the token in the follow-up prompt, rendered in that new turn's assistant row. |
+| Idle and final checkpoint | Both model replies remained readable after 45 seconds without browser/SSE connections and after a further stop/snapshot/resume. Final native conversation held seven records. |
+| Native permissions | Browser Deny returned 204; actual shell tool errored with user-declined text. An immediate same-session read-only native shell check exited 0 with `marker-absent`; no alternate write was accepted. |
+| Canonical production retrieval | Three completed reads, totals 79,860 / 78,456 / 1,404 / 257, overview/register citations and fabricated-data/safety warnings; genuine answer rendered. |
+| SSE cancellation | Native port 4096 established connections measured inside the VM: 0 before, 1 while SSE open, 0 after terminating the exact client. No model call used. |
+| Native PTY/WebSocket | Native create/ticket 200, actual socket received the requested marker, cleanup 204; no model call used. |
+| Retention and isolation | One-snapshot/no-expiry policy verified; final snapshot reported created, no expiry and the preceding owned session as source. Scoped scan of 216 retained files had zero unreadable files and zero supplied-model-key matches; two Nginx processes had zero supplied-key environment matches. This is not a claim about unscanned cloud logs. |
+
+Four completed manual prompt submissions produced six observed assistant messages
+with `$0.003279795` total runtime-reported response cost. One earlier prompt
+failed before generation with DNS timeout while the live VM still had deny-all
+egress; that failure was preserved, not counted as success. The cost excludes
+unobserved maintenance/title calls and is not verified provider invoice billing.
+No paid PR evaluation, public production assignment, database service or keepalive
+was introduced. Vercel resources were verified on active Hobby; usage is shared
+with other resources and remaining monthly allowance is not guaranteed.
+
+Sanitized local evidence is under the gitignored
+`.playwright-mcp/opencode-sandbox-live/`: `remember.json`, `recall.json`,
+`production.json`, `denial.json`, `before-stop.json`, `idle-retention.json`,
+`cancellation.json`, `pty-result.txt`, `secret-isolation.json`, `final-state.json`
+and `final-ingress.txt`. These are manual acceptance artifacts, not CI fixtures.
+
+### Remaining owner/lifecycle acceptance
+
+Repeat the verified checks when changing runtime/image, credentials or ingress;
+the unverified acceptance scope is listed below this checklist.
+
+- Verify incognito HTML/real assets/API/SSE and actual WS upgrade rejection, then
+  real browser Basic login and upstream UI/API with the correct password.
+- Verify cloud SSE cancellation/reconnect, concurrent first requests, native PTY,
+  owner session and genuine conversation across reload/new tab, idle, explicit
+  stop/automatic snapshot and explicit named resume with new VM/session identity.
+- After protection-first bootstrap, run only the approved limited real model/OKF/
+  denial checks. Never replace actual replies or tool outcomes with fixtures.
+- Verify returned canonical image, v2 command/status/stop response contracts,
+  retention (count 1/no expiry), usage and absence of supplied secrets in scoped
+  logs/image layers before owner acceptance. No public production promotion.
+
+The checks above establish explicit cloud snapshot conversation recovery, not
+preserved live SSE/PTY processes. Browser navigation alone does not
+resume a stopped VM; run `resume` explicitly. Automatic snapshots capture filesystem
+state when stopped, not running processes or uninterrupted availability. Native
+crash recovery after the platform's automatic timeout, interrupted model/tool
+recovery, extended retention under account limits, concurrent first requests and
+owner acceptance remain unverified. Gateway publication can return a new URL;
+use the current `resume` output rather than bookmarking an old route. Keep the
+stacked PR draft and the original Function preview unchanged until accepted.
+
+Official contracts: [persistence](https://vercel.com/docs/sandbox/concepts/persistent-sandboxes),
+[SDK lifecycle](https://vercel.com/docs/sandbox/sdk-reference),
+[named create](https://vercel.com/docs/rest-api/sandboxes/create-a-named-sandbox),
+[session commands](https://vercel.com/docs/rest-api/sandboxes/execute-a-command),
+[OpenAPI](https://vercel.com/openapi.json),
+[Nginx Basic auth](https://nginx.org/en/docs/http/ngx_http_auth_basic_module.html),
+[WebSocket proxying](https://nginx.org/en/docs/http/websocket.html).

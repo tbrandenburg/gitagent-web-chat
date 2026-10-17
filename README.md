@@ -26,6 +26,30 @@ runtime compatibility fixes. It does not include a custom chat server or UI.
 [OpenCode](#optional-opencode-v2) · [Troubleshooting](#troubleshooting) ·
 [Development](#development)
 
+### Retained named Sandbox follow-up (issue #13)
+
+An opt-in `opencode-sandbox` image target preserves the unchanged pinned OpenCode
+UI/exporter/native permissions while retaining workspace and SQLite under
+`/var/tmp/gitagent-opencode`. Standard Nginx Basic auth protects the complete
+Sandbox route, including static assets, API, SSE and WebSockets. Vercel Deployment
+Protection does **not** protect the independent `vercel.run` URL.
+
+Use the explicit host controller `skills/gitagent/scripts/opencode-sandbox.py`
+with `start`, `resume`, `status` or `stop` and mandatory scope, project, name and
+immutable VCR image. First bootstrap is model-free; `--with-model` requires a
+previously protection-verified, stopped Sandbox. No automatic deletion, expiry
+recreation, browser-triggered resume, inference or production promotion.
+See [commands, limits and acceptance checklist](/skills/gitagent/references/runtime-management.md#retained-named-sandbox-follow-up).
+Local no-model Docker tests cover authentication, actual SSE/PTY WebSocket,
+shutdown and native session metadata after process restart. **Manual cloud checks
+passed:** protected browser access, a real conversation and model recall across
+stop/snapshot/resume, 45-second idle retention, native denial, production retrieval,
+PTY output and SSE disconnect propagation. The named Sandbox retains one non-expiring
+filesystem snapshot; it is not an always-on service. Hobby runs are limited to
+45 minutes, resume is explicit, and the gateway URL can change after resume.
+Automatic-timeout recovery, in-flight execution recovery and owner acceptance
+remain unverified. Existing Function and local Docker workflows are unchanged.
+
 ## Quick start
 
 ### Prerequisites
@@ -451,9 +475,11 @@ WebSocket messages; actual native PTY/WebSocket output also passed. This is not
 a persistence fix; the original `make up-opencode` launcher is unchanged.
 Native session metadata was also lost after 45 seconds idle, despite successful
 server health checks. Manual export/import was inconsistent across subsequent
-requests. Persistent-chat acceptance remains blocked by Function-local SQLite;
-no database or Sandbox architecture change was introduced.
-SSE cancellation also remains blocked in cloud: baseline and gated streams closed
+requests. The Function path remains blocked by Function-local SQLite; its readiness
+fix introduced no database or Sandbox architecture change. The separately approved
+[Sandbox follow-up](#retained-named-sandbox-follow-up-issue-13) now verifies retained
+conversation history through an explicit snapshot/resume lifecycle.
+SSE cancellation also remains blocked in the Function path: baseline and gated streams closed
 by the client still reached Vercel's 300-second timeout. The documented opt-in
 cancellation setting is Node.js-only, not a verified container-runtime fix.
 The limited inference pass used a sensitive Preview-only model key. Five prompt

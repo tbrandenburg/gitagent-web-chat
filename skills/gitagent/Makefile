@@ -51,16 +51,21 @@ test:
 	node --test "$(GITAGENT_SKILL_DIR)/tests/mcp-config.test.mjs"
 	node --test "$(GITAGENT_SKILL_DIR)/tests/permissions.test.mjs"
 	node --test "$(GITAGENT_SKILL_DIR)/tests/opencode-ready.test.mjs"
+	node --test "$(GITAGENT_SKILL_DIR)/tests/sandbox-environment.test.mjs"
 
 lint:
 	bash -n "$(GITAGENT_SKILL_DIR)/scripts/web-agent.sh"
 	bash -n "$(GITAGENT_SKILL_DIR)/scripts/opencode-web.sh"
 	bash -n "$(GITAGENT_SKILL_DIR)/scripts/doctor.sh"
 	bash -n "$(GITAGENT_SKILL_DIR)/scripts/container-start.sh"
+	bash -n "$(GITAGENT_SKILL_DIR)/scripts/sandbox-start.sh"
 	node --check "$(GITAGENT_SKILL_DIR)/bin/export-opencode.mjs"
 	node --check "$(GITAGENT_SKILL_DIR)/bin/mcp-config.mjs"
 	node --check "$(GITAGENT_SKILL_DIR)/bin/permissions.mjs"
 	node --check "$(GITAGENT_SKILL_DIR)/bin/opencode-ready.mjs"
+	node --check "$(GITAGENT_SKILL_DIR)/bin/sandbox-supervisor.mjs"
+	node --check "$(GITAGENT_SKILL_DIR)/bin/sandbox-environment.mjs"
+	node --check "$(GITAGENT_SKILL_DIR)/tests/sandbox-environment.test.mjs"
 	node --check "$(GITAGENT_SKILL_DIR)/tests/opencode-ready.test.mjs"
 	node --check "$(GITAGENT_SKILL_DIR)/tests/fixtures/opencode-ready-backend.mjs"
 	python3 -c "import ast,pathlib; [ast.parse(p.read_text()) for d in ('scripts', 'bin', 'tests') for p in pathlib.Path('$(GITAGENT_SKILL_DIR)', d).glob('*.py')]"
@@ -69,6 +74,7 @@ lint:
 	node --check "$(GITAGENT_SKILL_DIR)/tests/container-transport.mjs"
 	node --check "$(GITAGENT_SKILL_DIR)/tests/container-permissions.mjs"
 	node --check "$(GITAGENT_SKILL_DIR)/tests/container-browser.mjs"
+	node --check "$(GITAGENT_SKILL_DIR)/tests/sandbox-pty.mjs"
 
 test-live:
 	"$(GITAGENT_SKILL_DIR)/scripts/web-agent.sh" test "$(AGENT_DIR)"

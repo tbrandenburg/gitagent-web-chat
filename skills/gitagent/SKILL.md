@@ -31,6 +31,10 @@ make -f "$SKILL_DIR/Makefile" logs AGENT_DIR="$AGENT_DIR"
 ```
 
 Use `up-opencode`, `status-opencode`, and `logs-opencode` for OpenCode V2.
+For the separately approved retained named Vercel Sandbox follow-up, read
+[the Sandbox lifecycle reference](references/runtime-management.md#retained-named-sandbox-follow-up).
+It uses an optional image target and explicit host controller, not these local
+launchers; default bootstrap transports no model credentials.
 Use `PORT=3334` or `OPENCODE_PORT=4097` to select another host port.
 Use `down` or `down-opencode` only when container removal is intended;
 OpenCode workspace edits and sessions are lost on removal.

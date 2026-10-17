@@ -29,8 +29,26 @@ RUN npm install -g @open-gitagent/gitagent@2.2.0 @open-gitagent/voice@1.0.0 \
 USER node
 CMD ["gitagent"]
 
-FROM source AS opencode
+FROM source AS opencode-base
 RUN npm install -g @open-gitagent/opengap@0.5.0 @opencode/cli@2.0.28 \
     && npm cache clean --force
 USER node
+
+FROM opencode-base AS opencode-sandbox
+USER root
+RUN apt-get update -qq \
+    && apt-get install -y -qq --no-install-recommends nginx-light util-linux \
+    && rm -rf /var/lib/apt/lists/*
+USER node
+ENV HOME=/var/tmp/gitagent-opencode/home \
+    XDG_CONFIG_HOME=/var/tmp/gitagent-opencode/home/.config \
+    XDG_DATA_HOME=/var/tmp/gitagent-opencode/home/.local/share \
+    XDG_STATE_HOME=/var/tmp/gitagent-opencode/home/.local/state \
+    XDG_CACHE_HOME=/var/tmp/gitagent-opencode/home/.cache \
+    OPENCODE_DB=/var/tmp/gitagent-opencode/session.db \
+    OKF_ROOT=/var/tmp/gitagent-opencode/workspace/knowledge
+ENTRYPOINT ["bash", "/opt/agent/skills/gitagent/scripts/sandbox-start.sh"]
+CMD []
+
+FROM opencode-base AS opencode
 CMD ["opencode"]
