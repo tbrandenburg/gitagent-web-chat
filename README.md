@@ -436,6 +436,17 @@ Real Chromium password entry, incorrect-password rejection, project selection,
 empty-session UI, reload/new tab and a 45-second idle reconnect were exercised.
 **Browser reliability is still blocked:** repeated runs exposed intermittent API
 503s and a folder-picker failure; later successful attempts do not resolve them.
+The no-model RCA reproduced two post-idle responses with native
+`{"code":"service_starting"}`: pinned OpenCode opens its socket before API boot
+finishes. The deployment image now uses a [TCP readiness gate](/skills/gitagent/bin/opencode-ready.mjs)
+that keeps `$PORT` closed until the native API, workspace integrations and exported
+agent IDs are ready. It relays bytes without changing HTTP/auth/SSE/WebSocket
+messages. This is a local-tested runtime adapter, **pending cloud/browser regression**,
+not a persistence fix; the original `make up-opencode` launcher is unchanged.
+Native session metadata was also lost after 45 seconds idle, despite successful
+server health checks. Manual export/import was inconsistent across subsequent
+requests. Persistent-chat acceptance remains blocked by Function-local SQLite;
+no database, Sandbox architecture change or paid inference was introduced.
 
 The [preview staging helper](/skills/gitagent/scripts/prepare-opencode-preview.py)
 copies tracked curated inputs outside the repository and generates root Docker

@@ -456,7 +456,7 @@ responses for `/api/command`, `/api/skill` and `/api/integration`, confirmed in
 Vercel request logs. The UI displayed `Request failed / UnexpectedStatus: 503`;
 one folder-picker attempt displayed `Unable to read this folder`. Later attempts
 loaded successfully, which does not resolve the intermittent failure. Runtime
-logs also recorded exit 130/SIGINT, but causation is unproven. Zero JavaScript
+logs also recorded exit 130, but the received signal and causation were unproven. Zero JavaScript
 page errors were observed; the wrong-password 401s were expected. Aborted
 worktree-refresh requests occurred during navigation. Preserve this as a release
 blocker, not a passing cloud-reliability claim.
@@ -474,6 +474,95 @@ Preview and rejected an unrelated Vercel hostname without runtime credential
 transport. The actual modified working tree was rejected before upload-directory
 creation. The complete credential-bearing smoke was not rerun after these fixes;
 no deployment or credential rotation was performed for this review follow-up.
+
+### Confirmed startup RCA and deployment-only gate
+
+A separate protected no-model reproduction (`dpl_CyPjG7yi2shguUywyd7np6eSLFHN`,
+baseline `0742da4`) sent 48 real API requests with at most four concurrent:
+24 immediate responses were 200; after 45 seconds idle, 22 responses were 200
+and two (`/api/command`, `/api/integration`) returned exactly
+`{"code":"service_starting"}` with `Retry-After: 1`. This identifies native
+startup dispatch, not a generic platform error. A correct-password browser
+attempt also received 503. Request PIDs of 1 do not identify distinct instances.
+
+The confirmed five-Whys chain is: browser errors because list-route clients reject
+undeclared 503s; 503s occur because native dispatch is still starting; dispatch is
+reachable because OpenCode binds before building application services; HTML can
+load because embedded assets bypass API readiness; the deployment exposes that
+early listener without an application-readiness gate. The platform's private
+routing algorithm and a particular instance replacement are not established.
+Pinned [server startup/dispatch](https://github.com/anomalyco/opencode/blob/026b106bc5d41b679ffc413264229c340871e4d3/packages/server/src/process.ts)
+and [generated client](https://github.com/anomalyco/opencode/blob/026b106bc5d41b679ffc413264229c340871e4d3/packages/client/src/promise/generated/client.ts)
+provide the source chain. The [official Vercel mapping](https://vercel.com/kb/guide/docker-compose-concepts-on-vercel)
+states that healthcheck/readiness has no direct equivalent; its published Services
+schema has no readiness option. Do not assume Docker `HEALTHCHECK` gates traffic.
+The pinned Effect 4.0.1 runtime maps both SIGTERM and SIGINT to interruption-only
+exit 130, so that exit code alone is not evidence of SIGINT.
+
+Only the feasibility/deployment image's OpenCode branch now starts
+`bin/opencode-ready.mjs` as PID 1. It spawns the unchanged pinned CLI on loopback
+4096 (4097 when public `$PORT` is 4096), uses authenticated loopback checks for
+`/api/info`, workspace `/api/integration` and exported main/child agent IDs,
+and opens public IPv4 `$PORT` only afterward. Startup is bounded to 90 seconds;
+each probe and backend TCP connection is bounded to two seconds. Internal
+readiness polling does not retry client requests. The raw TCP relay preserves
+HTTP/auth bytes, streaming and upgrade traffic; it adds no chat API or permissions.
+Signals stop admission and reach only the owned child; after eight seconds a
+stubborn owned child is killed. Backend exit fails closed, without auto-restart.
+
+Local checks with the pinned image verified first-external-API 200 without HTTP
+retry, native missing/incorrect auth 401, registered exported permissions, bundled
+assets and actual SSE cancellation, initially and after restart. Synthetic
+transport/lifecycle tests separately exercise half-close, large responses,
+upgrades, timeout, missing agents, startup/child exit, signals and port collision.
+These synthetic tests are not cloud E2E. The coordinator must repeat the real
+48-request idle scenario and browser password login before claiming the cloud
+startup blocker fixed. `/api/info.urls` advertises the internal listener; URL
+advertisement, real cloud PTY/WebSocket behavior, startup deadlines and session
+durability are not fixed by this gate. Native permissions and the original
+`scripts/opencode-web.sh` local workflow remain unchanged. No model call is needed
+or authorized for these checks.
+
+### Session-lifetime RCA and remaining model gates
+
+A no-inference native API fixture created a real session in `/tmp/workspace` and
+read its title back successfully three times. With browser/SSE connections closed
+for 45 seconds, three subsequent session reads returned 404 `SessionNotFoundError`
+while `/api/info` returned 200. Browser-local project selection surviving reload
+is therefore not evidence that an OpenCode session survived. This is a demonstrated
+session-continuity failure, not a missing model key or a permission denial.
+
+The session five-Whys chain is separate from readiness: the session ID is absent
+from the database serving later requests; OpenCode stores sessions in local SQLite;
+the image places XDG data below ephemeral `/tmp`; Function instances do not share
+that filesystem and Preview instances scale down after idle; this deployment maps
+a stateful agent server onto a stateless Function lifecycle without durable state.
+See [Vercel filesystem/lifecycle](https://vercel.com/docs/functions/runtimes) and
+the [container state mapping](https://vercel.com/kb/guide/docker-compose-concepts-on-vercel).
+The exact private routing decision is not observable from PID 1 alone.
+
+Native experimental export/import was also exercised with manufactured session
+metadata and no messages. One import/read worked, but a repeat returned import
+200 followed immediately by session-read 404. It is not a reliable recovery
+workaround across independently routed instances. A sanitized export redacts
+titles and message content and is unsuitable as a full-fidelity backup. No
+conversation, model answer or durable restoration is claimed from these fixtures.
+
+Do not add keepalives, silently introduce a database, or call the readiness adapter
+a persistence solution. A usable persistent-chat GO needs a separately approved
+state/lifecycle decision. The owner-mentioned [persistent Sandbox alternative](https://vercel.com/docs/sandbox/concepts/persistent-sandboxes)
+now documents automatic filesystem snapshots on stop and hooks on resume, with
+[capped Hobby quotas](https://vercel.com/docs/sandbox/pricing); that is a separate
+architecture, not a Function configuration fix. The official OpenCode Sandbox
+guide uses older V1 examples/unpinned installation and must not replace this
+repository's pinned V2 exporter/permissions. No Sandbox or persistence resource
+was created for this investigation.
+
+Cloud model credentials remain absent. Genuine normal-chat/production-OKF answers
+and harmless model-mediated shell/write denial require explicit inference-spend
+approval after the deployment/lifecycle gate is addressed. No prompt was submitted
+and no paid model invocation was made; session metadata fixtures do not substitute
+for those acceptance tests.
 
 ### Limits, rollback and research-only alternatives
 
