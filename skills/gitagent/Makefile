@@ -55,12 +55,16 @@ lint:
 	bash -n "$(GITAGENT_SKILL_DIR)/scripts/web-agent.sh"
 	bash -n "$(GITAGENT_SKILL_DIR)/scripts/opencode-web.sh"
 	bash -n "$(GITAGENT_SKILL_DIR)/scripts/doctor.sh"
+	bash -n "$(GITAGENT_SKILL_DIR)/scripts/container-start.sh"
 	node --check "$(GITAGENT_SKILL_DIR)/bin/export-opencode.mjs"
 	node --check "$(GITAGENT_SKILL_DIR)/bin/mcp-config.mjs"
 	node --check "$(GITAGENT_SKILL_DIR)/bin/permissions.mjs"
-	python3 -c "import ast,pathlib; [ast.parse(p.read_text()) for d in ('scripts', 'bin') for p in pathlib.Path('$(GITAGENT_SKILL_DIR)', d).glob('*.py')]"
+	python3 -c "import ast,pathlib; [ast.parse(p.read_text()) for d in ('scripts', 'bin', 'tests') for p in pathlib.Path('$(GITAGENT_SKILL_DIR)', d).glob('*.py')]"
 	node --check "$(GITAGENT_SKILL_DIR)/tests/live-chat.mjs"
 	node --check "$(GITAGENT_SKILL_DIR)/tests/live-opencode-mcp.mjs"
+	node --check "$(GITAGENT_SKILL_DIR)/tests/container-transport.mjs"
+	node --check "$(GITAGENT_SKILL_DIR)/tests/container-permissions.mjs"
+	node --check "$(GITAGENT_SKILL_DIR)/tests/container-browser.mjs"
 
 test-live:
 	"$(GITAGENT_SKILL_DIR)/scripts/web-agent.sh" test "$(AGENT_DIR)"

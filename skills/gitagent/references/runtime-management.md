@@ -8,6 +8,7 @@
 - [Relocation migration](#relocation-migration)
 - [Runtime dependencies](#runtime-dependencies)
 - [Checks and troubleshooting](#checks-and-troubleshooting)
+- [Local container feasibility](#local-container-feasibility)
 
 ## Invocation and ownership
 
@@ -193,3 +194,131 @@ Neither these rules nor a declarative hook binding proves GitAgent browser
 enforcement. The browser runtime is a trusted localhost demo, not a policy
 sandbox. Hooks require a host that implements OpenGAP's JSON hook protocol.
 OpenCode uses native permissions rather than executing that hook script.
+
+## Local container feasibility
+
+Issue #11's local-only experiment uses
+`assets/Dockerfile.feasibility` with two targets. Run the two `docker build`
+commands in [the README](/README.md#local-container-feasibility-issue-11) from
+the **repository root**. The Dockerfile-specific `.dockerignore` allowlists
+agent inputs and excludes environment files, Git metadata, evaluation packages,
+dependencies, tests, caches and runtime memory. No build args or model credentials
+are required. Direct npm versions and the existing mutable Node base tag match
+the local launchers; transitive npm and OS packages are not lockfile-pinned.
+
+Both targets run as UID 1000. `/opt/agent` is immutable bundled source;
+`scripts/container-start.sh` copies it to `/tmp/workspace`, initializes runtime
+Git, and starts the original server. OpenCode uses the existing exporter in that
+temporary workspace; host instructions are never exported over. GitAgent's
+existing compatibility patches plus `bin/configure-container.py` run at image
+build time. The latter is a guarded, deployment-only `$PORT`/IPv4 bind adapter.
+Neither original Docker launcher is changed. Cold start installs no packages.
+
+### Reproduce without model calls
+
+```sh
+python3 skills/gitagent/tests/container-smoke.py gitagent --port 80
+python3 skills/gitagent/tests/container-smoke.py opencode --port 80
+python3 skills/gitagent/tests/container-smoke.py gitagent --browser
+python3 skills/gitagent/tests/container-smoke.py opencode --browser
+python3 skills/gitagent/tests/container-image-audit.py gitagent-feasibility:local
+python3 skills/gitagent/tests/container-image-audit.py opencode-feasibility:local
+```
+
+`--port 80` tests the default with `PORT` unset; the default test option tests
+`PORT=8080`. Servers must bind `0.0.0.0`, while Docker publishes a random
+**127.0.0.1-only** host port. Tests use a read-only root, 512 MiB `/tmp` tmpfs,
+UID/GID 1000, dropped capabilities, no-new-privileges, and a 2 GiB / 1 CPU cap.
+The private test bridge is not an outbound firewall. No model credentials are
+forwarded; external browser requests are aborted. No prompt or terminal input is
+submitted. The scanner checks image layers, including deleted files, for the
+inherited OpenAI key when present and a synthetic exclusion canary, without
+printing matches. This is not a general secret detector or dependency audit.
+
+Browser checks require an existing host Playwright/Chromium installation; no
+browser dependency is added to the images or offline checks. If necessary,
+install Playwright outside the repository and set `PLAYWRIGHT_MODULE` to its
+absolute module directory. Install Chromium using that installation's CLI.
+Screenshots remain ignored under `.playwright-mcp/`.
+
+### Observed local results and limits
+
+| Evidence | GitAgent | OpenCode V2 |
+| --- | --- | --- |
+| Root-context local build | Passed; approximately 553 MiB image | Passed; approximately 1.14 GiB image |
+| HTTP-ready startup after Docker start | Approximately 1–3 seconds serially | Approximately 1–2 seconds serially |
+| Non-inference memory sample after browser checks | Approximately 57–62 MiB | Approximately 270–400 MiB |
+| Browser | Actual login failure/success, chat shell, file tree, ready transcript | Actual bundled shell, assets, authenticated API, project picker and `/tmp/workspace` selection |
+| Transport | Authenticated root WebSocket ready event | Authenticated `/api/event` SSE `server.connected` |
+| Unauthorized access | HTTP 200 **login HTML**, not JSON data; WS upgrades then closes **4401** | Static shell is public; API rejects incorrect/missing Basic credentials with 401 |
+| Source/OKF | Manifest unchanged, source present, 7 concepts valid | Same, plus exported main/child permissions registered in native API |
+| Restart / fresh container | Starts again; `/tmp` marker disappears on Docker restart | Same; generated config and database recreated |
+| Exposure verdict | **NO-GO** beyond trusted localhost | **CONDITIONAL GO** for protected cloud feasibility only |
+
+These timings exclude image build, are warm-host local observations, and do not
+predict Vercel cold starts or model-call resource peaks. Concurrent builds/audits
+and four container tests raised readiness to approximately 4–9 seconds. One
+concurrent OpenCode Chromium run remained blank and timed out; the serial rerun
+passed. The cause is unproven: load/repeated-browser startup needs further testing.
+A passing HTTP response
+is not sufficient OpenCode readiness: custom agents register asynchronously.
+Tests wait for both exported IDs, preserve the ordered manifest rules after
+native defaults, and permit only additional deny rules after those rules.
+They do not prove actual tool denial through a model-backed conversation.
+
+Writable paths observed: GitAgent's workspace Git, `.gitagent` journals and
+workspace data live below `/tmp/workspace`; its home is `/tmp/home`. OpenCode
+also creates XDG config/cache/state and SQLite/session/log data below
+`/tmp/home/.{config,cache,local}`. No root-layer writes were observed under the
+read-only-root test. The bundled source is preserved, not a durable workspace.
+Scale-out, cold starts and recreation lose edits, history, memory and sessions.
+Runtime Git, MCP connectivity, subagents, SkillsFlow execution, uploads, voice,
+model replies and knowledge reasoning are **not verified** by these tests.
+Definitions remain bundled; there is no claim of stateful feature parity.
+
+### GitAgent permission blocker
+
+The actual pinned SDK creates CLI/write/memory tools independently of the
+manifest permissions extension. Browser, SkillsFlow and background-memory
+queries do not pass SDK tool restrictions. The upstream script-hook runner
+invokes the Python policy with `sh` and a different payload, then fails open
+on errors. The direct, no-inference probe of actual builtins plus real wrappers
+observed **3 approval bypasses and 3 hook errors**; an explicit blocking control
+proved that wrappers were active. Marker shell/write/memory operations were
+confined to a disposable fixture and removed afterward.
+
+`LOCAL_FEASIBILITY_ONLY=1` is required to start this GitAgent image, with a
+non-demo password. That flag is an acknowledgement, **not a sandbox or network
+restriction**. Do not give it model credentials or expose it publicly. A positive
+SDK tool allowlist alone would not solve unrestricted reads or direct browser
+settings/file-write/upload/skill-install endpoints. A separate fail-closed
+restriction design and real denial tests are required before cloud exposure;
+this spike does not silently disable those features or change the agent policy.
+
+### Explicit cloud gates — not implemented
+
+Official [Container Runtime](https://vercel.com/docs/functions/runtimes/container)
+documentation auto-detects a root `Dockerfile.vercel`; Services accepts a nested
+Dockerfile entrypoint relative to service root. Local `docker build -f` proves
+repository-root context here, **not** Vercel's nested context or Docker target
+selection. No root configuration was needed for this local experiment. The
+multi-stage target selection and exact per-project cloud entrypoints remain
+unverified; do not invent a target-selection schema or push these images yet.
+
+Prefer separate projects at `/`: GitAgent uses a root WebSocket and OpenCode
+uses root `/_assets` and `/api` paths. No upstream prefix rewrite was attempted.
+The owner must explicitly decide project creation, personal/non-commercial
+Hobby eligibility, **All Deployments** Vercel Authentication, runtime credentials,
+[registry storage costs](https://vercel.com/docs/container-registry/limits-and-pricing),
+and model-inference spending before cloud work. Do not enable GitHub automatic
+deployments before protection and verified entrypoints are ready.
+
+Hobby's documented 300-second connection/invocation bound and 2 GiB / 1 vCPU
+limit still require cloud measurement, including reconnect/state loss after
+idle. Both local images exceed the generic 250 MB Function bundle limit;
+VCR's 15 GB registry limit is **not proof of deployable Function size**. Confirm
+actual container size eligibility and account costs before upload. Remaining
+cloud tests include build schema/context, protected HTTP/API/stream/socket
+access, temporary filesystem rules, cold start/idle/scale-out, signal handling,
+one approved genuine reply and OKF question, real permission denial, usage and
+owner manual signoff. Neither runtime has a Vercel deployment verdict yet.

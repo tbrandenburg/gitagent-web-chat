@@ -397,6 +397,31 @@ runtime and checked against expected source patterns.
 Keep the demo on localhost. Public exposure needs HTTPS and stronger access
 controls; the default passwords are for local demonstrations only.
 
+## Local container feasibility (issue #11)
+
+The optional [local-only spike](/skills/gitagent/references/runtime-management.md#local-container-feasibility)
+preinstalls the same pinned runtimes in non-root images, bundles the existing
+agent, and confines writable state to `/tmp`. It does not replace `make up` or
+`make up-opencode`, provide a new frontend, or configure Vercel deployments.
+
+From the repository root:
+
+```sh
+docker build --target gitagent -f skills/gitagent/assets/Dockerfile.feasibility -t gitagent-feasibility:local .
+docker build --target opencode -f skills/gitagent/assets/Dockerfile.feasibility -t opencode-feasibility:local .
+python3 skills/gitagent/tests/container-smoke.py gitagent
+python3 skills/gitagent/tests/container-smoke.py opencode
+```
+
+These opt-in tests generate disposable passwords, publish only localhost ports,
+omit model keys, and remove their own containers/networks. They make no inference
+requests. See the reference for browser tests, image-layer audits, measured
+results, and cloud gates. GitAgent's probe intentionally demonstrates **unsafe
+permission bypasses**, not successful enforcement: **NO-GO for public exposure**.
+OpenCode is **CONDITIONAL GO for an owner-approved protected cloud experiment**,
+not a production or security-parity claim. No Vercel project or registry upload
+is included; cloud work and inference spending require a separate owner decision.
+
 ## Development
 
 Offline checks require Bash, Make, **Python 3.12**, **Node.js 22.22+**,
