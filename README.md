@@ -15,6 +15,8 @@ launchers for two upstream chat interfaces. The configured model is
   `agent.yaml`.
 - **Choose a frontend:** use GitAgent or the optional OpenCode V2 runtime.
 - **Explore MCP tools:** the manifest includes the public Context7 endpoint.
+- **Evaluate changes:** run native Promptfoo regressions through real OpenCode
+  sessions, including source-backed answers, security delegation, and permissions.
 
 This is an experimental localhost demo with upstream interfaces and guarded
 runtime compatibility fixes. It does not include a custom chat server or UI.
@@ -382,6 +384,8 @@ inside the container:
 - Replace the voice warning with “Text chat ready”, serve HTTP 204 for the missing
   favicon, and apply the upstream compact layout up to 900 px.
 - Infer HTTP transport for URL-only MCP server declarations.
+- Keep the voice server's automatic raw session journals under ignored
+  `.gitagent/journal/`, outside the curated OKF memory bundle.
 
 No frontend file is vendored or modified. Adaptations are specific to the pinned
 runtime and checked against expected source patterns.
@@ -393,17 +397,21 @@ controls; the default passwords are for local demonstrations only.
 
 ## Development
 
-Offline checks require Bash, Make, **Python 3.12**, **Node.js 22**, and
-**PyYAML 6.0.3**. Install PyYAML in your active Python environment, then run:
+Offline checks require Bash, Make, **Python 3.12**, **Node.js 22.22+**,
+**PyYAML 6.0.3**, and **jsonschema 4.26.0**. Install development dependencies
+in your active Python environment (use `uv pip install` if pip is unavailable):
 
 ```sh
-python3 -m pip install PyYAML==6.0.3
-make lint test validate
+python3 -m pip install -r requirements-dev.txt
+npm ci
+make lint test validate doctor
+npm run eval:validate
 ```
 
 [GitHub Actions](.github/workflows/checks.yml) runs the same command on PRs and
-`main`. It checks shell/JavaScript syntax, Python and Node regression tests,
-and the OKF bundle. Offline checks need no Docker or API credentials.
+`main`. It checks shell/JavaScript/Python syntax, Python and Node regression
+tests, pinned manifests, both OKF bundles, diagnostics, and native Promptfoo
+configuration. Offline checks need no Docker or API credentials.
 
 `make test-tooling` runs the skill's Python and Node suites with temporary,
 agent-independent fixtures. `make test-agent` checks this agent's manifest,
@@ -429,15 +437,156 @@ Check the UI separately when changing layout or transcript behavior.
 
 ### Repository map
 
-| Path | Purpose |
-| --- | --- |
-| [agent.yaml](agent.yaml), [SOUL.md](SOUL.md), [RULES.md](RULES.md) | Agent model, identity, and behavior |
-| [knowledge/](knowledge/) | OKF navigation, concepts, and fictional sample data |
-| [skills/gitagent/](skills/gitagent/) | Portable runtime-management skill: launchers, helpers, tooling tests, environment template |
-| [skills/okf-knowledge/](skills/okf-knowledge/), `skills/echo-*/` | Agent-owned retrieval and demonstration skills |
-| [workflows/](workflows/) | Agent-owned SkillsFlow definitions |
-| [tests/](tests/) | Agent content/workflow regression tests and production live scenario |
-| [Makefile](Makefile) | Thin runtime delegation and agent-specific checks |
+One repository remains one main agent. The engineering/security capabilities
+extend this demo; they do not replace its identity or fictional production data.
+
+```text
+gitagent-web-chat/
+├── agent.yaml                    # Main GitAgent manifest + permissions extension
+├── SOUL.md / RULES.md / DUTIES.md # Identity, behavior, responsibilities
+├── AGENTS.md                     # Cross-platform contributor instructions
+├── README.md / LICENSE / .gitignore
+├── schemas/
+│   ├── agent.schema.json         # Pinned OpenGAP fork, extended for permissions
+│   ├── hooks.schema.json         # Pinned upstream hook configuration contract
+│   ├── memory.schema.json        # Pinned upstream memory configuration contract
+│   └── UPSTREAM.md               # Source revision, extensions, runtime caveats
+├── agents/security-reviewer/
+│   ├── agent.yaml                # Independent model, read-only permissions
+│   └── SOUL.md / RULES.md / DUTIES.md
+├── skills/
+│   ├── gitagent/                 # Portable host-side management and evaluation
+│   │   ├── SKILL.md / Makefile / LICENSE
+│   │   ├── bin/                  # Exporter, permission adapter, OKF, eval runner
+│   │   ├── scripts/              # GitAgent and OpenCode Docker launchers
+│   │   ├── references/           # Runtime and evaluation instructions
+│   │   ├── assets/               # Environment template
+│   │   └── tests/                # Agent-independent tooling and live harnesses
+│   ├── okf-knowledge/SKILL.md     # Progressive knowledge retrieval
+│   ├── code-review/SKILL.md      # Evidence-based review and explicit delegation
+│   ├── testing/SKILL.md          # Offline versus live testing guidance
+│   └── echo-{start,middle,end}/SKILL.md
+├── workflows/echo-chain.yaml     # Existing native GitAgent SkillsFlow
+├── knowledge/                    # Curated OKF v0.2 knowledge bundle
+│   ├── index.md / index.yaml / log.md
+│   ├── production/               # Fictional data, registers, rollups, topic index
+│   ├── operations/               # Runtime playbook and topic index
+│   └── decisions/                # Design decision and topic index
+├── memory/                       # Separate OKF v0.2 memory bundle
+│   ├── index.md / log.md / MEMORY.md
+│   ├── memory.yaml               # Native GitAgent config, not an OKF concept
+│   └── lessons/                  # Draft lesson with its navigation index
+├── hooks/
+│   ├── hooks.yaml                # OpenGAP pre_tool_use binding
+│   └── scripts/enforce-policy.py # Fail-closed JSON hook implementation
+├── evals/
+│   ├── promptfooconfig.yaml      # Native Promptfoo config and published schema
+│   ├── cases/                    # SQL injection, production, delegation, policy
+│   ├── assertions/               # Actual tool-event and side-effect checks
+│   └── results/                  # Generated output, ignored
+├── docs/evaluation-security.md   # Trusted inputs and dependency advisories
+├── scripts/
+│   ├── doctor.sh                 # Offline diagnostics without secret reads
+│   ├── validate-manifests.py     # Pinned schema and dependency checks
+│   ├── validate-okf.py           # Check knowledge and memory independently
+│   └── promptfoo_gitagent.py     # Native Python provider using the skill runner
+├── tests/                        # Agent regressions and production live scenario
+├── .github/workflows/
+│   ├── checks.yml                # Offline governance on PRs and main
+│   └── agent-evals.yml           # Explicit manual live-evaluation workflow
+├── Makefile                      # Runtime delegation and agent governance
+├── requirements-dev.txt          # Pinned Python validation dependencies
+└── package.json / package-lock.json # Pinned Promptfoo toolchain
+```
+
+Ignored local state may also include `.gitagent/`, `workspace/`, `.promptfoo/`,
+`memory/runtime/`, and `memory/archive/`. Legacy non-OKF journals can be retained
+under `.gitagent/legacy-memory-journal/` rather than published as curated memory.
+The pinned voice server's automatic raw journals are redirected to
+`.gitagent/journal/`; they are not OKF concepts or curated long-term memories.
+Every concept Markdown file in the two OKF bundles, including `MEMORY.md`, has
+YAML `type` frontmatter. `index.md` and `log.md` follow OKF's reserved-file rules.
+
+There are no placeholder `tools/` or `adapters/` directories. Existing native
+GitAgent tools (`cli`, `read`, `write`, `memory`) remain in use; the working
+OpenCode adapter stays in the portable management skill. Claude, Codex, and
+MetaHarness adapters are optional future integrations, not dependencies or
+claimed implementations.
+
+## Promptfoo evaluations and governance
+
+[Promptfoo](https://www.promptfoo.dev/docs/intro/) is an open-source CLI/library
+for evaluating and red-teaming LLM applications. It combines prompts, providers,
+test inputs, and assertions into repeatable evaluations. Assertions can be
+deterministic (strings, regexes, code) or model-graded (`llm-rubric`, which needs
+an additional grader configuration and model access). It is an evaluation
+tool, not the agent runtime, memory format, or a permission enforcement engine.
+
+This repository uses [native YAML configuration](https://www.promptfoo.dev/docs/configuration/reference/)
+and the [published schema](https://promptfoo.dev/config-schema.json), plus a
+[custom Python provider](https://www.promptfoo.dev/docs/providers/python/).
+The provider calls the portable GitAgent skill's runner against the existing
+OpenCode container. That runner resolves the main manifest/model and executes
+`opencode run --format json --model provider/model --agent gitagent-main` with
+the prompt passed as an argument, not stdin. Only `target: main` is supported;
+delegation is exercised through a real child invocation, not by impersonating
+a subagent with a different prompt.
+
+```sh
+npm ci
+npm run eval:validate             # Offline; no agent invocation
+make up-opencode                  # Needs inherited OPENAI_API_KEY
+# After instruction/manifest edits, refresh the selected existing runtime:
+bash skills/gitagent/scripts/opencode-web.sh refresh "$PWD"
+make eval                         # Real model calls, no cache, sequential cases
+```
+
+`evals/results/latest.json` contains the results, including tool-event evidence.
+Keep results private: they can contain prompts and source content. The suite
+checks SQL injection remediation, the existing production totals/citations,
+an actual completed `security-reviewer` call, and an attempted shell action
+rejected by the non-interactive runtime with no marker file created. A verbal
+claim of delegation or denial is insufficient. These are deterministic
+assertions over real output, not an LLM judge or canned provider. The Python
+provider timeout is in milliseconds; `runner_timeout_seconds` is separate.
+
+Live evaluations are **not** run on untrusted PRs. The manual
+[live workflow](.github/workflows/agent-evals.yml) requires a repository
+`OPENAI_API_KEY` secret and uploads result artifacts. Offline checks validate
+the config; they do not prove model behavior. See [evaluation security](docs/evaluation-security.md)
+for dependency advisories and trusted-input boundaries.
+
+### Ownership and enforcement boundaries
+
+| Responsibility | Canonical location | Validation/enforcement |
+| --- | --- | --- |
+| Main agent and subagents | `agent.yaml`, `agents/*/agent.yaml` | Pinned extended OpenGAP schema |
+| Skills | `skills/*/SKILL.md` | Agent Skills frontmatter and referenced-file regression checks |
+| Knowledge and memory | `knowledge/`, `memory/` | Basic OKF v0.2 structure checks, not attestation verification |
+| Permissions | Manifest `permissions` | Native OpenCode V2 rules exported by the skill |
+| Hook protocol | `hooks/` | Tested JSON pre-tool policy; requires a hook-capable host |
+| Evaluations | `evals/` | Native Promptfoo validation and optional live runs |
+| Governance | `.github/workflows/`, `schemas/` | Offline CI and separately triggered live CI |
+
+The permissions block is a **local OpenGAP extension**, documented in
+[schemas/UPSTREAM.md](schemas/UPSTREAM.md). Use `make validate`, not upstream
+`opengap validate`, to enforce it. The main agent asks before shell/edit actions;
+non-interactive evaluations reject those requests. The read-only child has its
+own deny-default policy. Code Mode is enabled for the main agent so permitted
+MCP tools remain accessible; nested calls still enforce their native permissions.
+
+**GitAgent browser chat is not a policy sandbox.** Its pinned runtime is not
+claimed to enforce the custom permissions or execute the hook binding. OpenCode
+uses native permission rules, not the hook script. The hook implements OpenGAP's
+JSON I/O contract for compatible hosts and blocks `ask` without an approval UI.
+The two paths are deliberately documented rather than treated as equivalent.
+
+Memory is distinct from knowledge: observations remain draft/unverified until
+corroborated; writes require an explicit request. `memory.yaml` uses
+`memory/MEMORY.md` because the pinned GitAgent runtime resolves layer paths from
+the agent root despite upstream's schema description saying memory-relative.
+The adapter copies curated memory but never promises to enforce OKF on arbitrary
+runtime-authored writes; validate after intentional edits.
 
 For help, [open an issue](https://github.com/tbrandenburg/gitagent-web-chat/issues).
 Include the command, runtime, and relevant logs with credentials removed.

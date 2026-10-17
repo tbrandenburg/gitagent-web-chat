@@ -1,0 +1,6 @@
+hooks:
+  pre_tool_use:
+    - script: scripts/enforce-policy.py
+      description: Fail-closed manifest permission check for hook-capable runtimes
+      timeout: 10
+      fail_open: false

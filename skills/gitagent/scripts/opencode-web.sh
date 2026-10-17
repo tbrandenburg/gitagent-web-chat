@@ -53,6 +53,7 @@ case "$COMMAND" in
        -v "$AGENT_DIR:/source-agent:ro" \
        -v "$LAUNCHER_DIR/bin/export-opencode.mjs:/export-opencode.mjs:ro" \
        -v "$LAUNCHER_DIR/bin/mcp-config.mjs:/mcp-config.mjs:ro" \
+       -v "$LAUNCHER_DIR/bin/permissions.mjs:/permissions.mjs:ro" \
        -v "$LAUNCHER_DIR/bin/okf:/usr/local/bin/okf:ro" \
        -v "$LAUNCHER_DIR/tests:/launcher-tests:ro" \
        -e OPENAI_API_KEY -e OPENCODE_SERVER_PASSWORD -e OKF_ROOT=/workspace/knowledge \
@@ -65,16 +66,21 @@ case "$COMMAND" in
             npm install -g @open-gitagent/opengap@0.5.0 @opencode/cli@2.0.28
             tar -C /source-agent --exclude=.git --exclude=".env*" --exclude=.gitagent \
               --exclude=.playwright-mcp --exclude=node_modules --exclude=__pycache__ \
-              --exclude=memory --exclude=workspace -cf - . | tar -C /workspace -xf -
+              --exclude=memory/runtime --exclude=memory/archive --exclude=evals/results \
+              --exclude=.promptfoo --exclude=workspace -cf - . | tar -C /workspace -xf -
             git -C /workspace init --initial-branch=main
             touch /runtime/workspace-ready
           fi
-          for path in knowledge RULES.md SOUL.md DUTIES.md agent.yaml skills; do
+          for path in knowledge RULES.md SOUL.md DUTIES.md agent.yaml skills agents; do
             rm -rf "/workspace/$path"
             if [[ -e "/source-agent/$path" ]]; then
               cp -a "/source-agent/$path" "/workspace/$path"
             fi
           done
+          mkdir -p /workspace/memory
+          if [[ -d /source-agent/memory ]]; then
+            tar -C /source-agent/memory --exclude=runtime --exclude=archive -cf - . | tar -C /workspace/memory -xf -
+          fi
           node /export-opencode.mjs /workspace
           cd /workspace
           exec opencode serve --hostname 0.0.0.0 --port 4096
@@ -89,15 +95,20 @@ case "$COMMAND" in
     if docker container inspect "$NAME" >/dev/null 2>&1; then
       docker exec "$NAME" bash -lc '
         set -euo pipefail
-        for path in knowledge RULES.md SOUL.md DUTIES.md agent.yaml skills; do
+        for path in knowledge RULES.md SOUL.md DUTIES.md agent.yaml skills agents; do
           rm -rf "/workspace/$path"
           if [[ -e "/source-agent/$path" ]]; then
             cp -a "/source-agent/$path" "/workspace/$path"
           fi
         done
+        mkdir -p /workspace/memory
+        if [[ -d /source-agent/memory ]]; then
+          tar -C /source-agent/memory --exclude=runtime --exclude=archive -cf - . | tar -C /workspace/memory -xf -
+        fi
         node /export-opencode.mjs /workspace
       '
       docker restart "$NAME" >/dev/null
+      wait_for_http "http://127.0.0.1:$PORT/" 300
     else
       "$0" start "$AGENT_DIR"
     fi

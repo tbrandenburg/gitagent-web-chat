@@ -105,6 +105,7 @@ case "$COMMAND" in
  refresh)
     if docker container inspect "$NAME" >/dev/null 2>&1; then
       docker restart "$NAME" >/dev/null
+      wait_for_http "http://127.0.0.1:$PORT/" 300
     else
       "$0" start "$AGENT_DIR"
     fi

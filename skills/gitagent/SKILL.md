@@ -1,6 +1,6 @@
 ---
 name: gitagent
-description: Launch and manage an existing GitAgent-compatible agent in Docker using GitAgent browser chat or OpenCode V2. Use for starting, stopping, refreshing, inspecting, troubleshooting, or testing agent runtimes, exporting OpenCode configuration, and inspecting OKF knowledge. Does not create or replace agent identity, rules, domain skills, or knowledge.
+description: Launch and manage an existing GitAgent-compatible agent in Docker using GitAgent browser chat or OpenCode V2. Use for runtime lifecycle, diagnostics, real opencode run evaluations, exporting permissions and subagents, and inspecting OKF knowledge or memory. Does not create or replace agent identity, rules, domain skills, or knowledge.
 ---
 
 # GitAgent runtime management
@@ -56,6 +56,28 @@ Use `test-live` for a real GitAgent response, `test-gitagent-mcp-live` for
 GitAgent Context7 calls, or `test-mcp-live` for OpenCode Context7 calls.
 Run live checks only against the intended running agent; they consume API tokens.
 Keep domain-specific tests in the agent repository, outside this skill.
+
+## Evaluate actual model output
+
+Use the selected running OpenCode container, not the host assistant's session:
+
+```sh
+python3 "$SKILL_DIR/bin/run-eval.py" --agent-dir "$AGENT_DIR" -- "Your test prompt"
+```
+
+The runner resolves the container from the canonical agent path, submits the
+prompt as an argv argument to `opencode run --format json`, and returns actual
+assistant text plus tool-event evidence. It does not start or refresh containers.
+Refresh OpenCode first after changing agent files. Each invocation creates a
+fresh session; failures, empty output, and timeouts fail explicitly. Only the
+main target is supported: test delegation by requesting a real child tool call.
+Native Promptfoo suites belong to the agent (`evals/`); the provider can call
+this runner. Never count a textual claim of delegation as proof of execution.
+
+The exporter maps the optional manifest permissions extension and declared
+subagents to native V2 configuration. This is not a Docker sandbox, and does
+not enforce permissions in GitAgent browser chat. An `ask` action may be
+rejected in non-interactive evaluation. See the reference for alias mappings.
 
 Copy [the environment template](assets/.env.example) to the selected agent's
 `.env` only if needed and only if it does not exist. Treat `.env` as trusted

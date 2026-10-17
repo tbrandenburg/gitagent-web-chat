@@ -66,7 +66,8 @@ configuration without intending replacement.
 missing containers. It therefore requires host Python/PyYAML and model credentials.
 Use an individual launcher for a single runtime. OpenCode refresh replaces its
 knowledge, identity, rules, manifest, and skills from source before re-exporting.
-It does not synchronize arbitrary workspace files or workflows.
+It also refreshes declared subagents and overlays curated memory without
+deleting runtime memory. It does not synchronize arbitrary workspace files or workflows.
 
 Keep `SKILL.md` concise: the pinned OpenGAP exporter includes discovered skill
 instructions in generated agent instructions. Bundled reference files are not
@@ -108,6 +109,10 @@ pinned. GitAgent's voice package supplies the text-chat UI too. The guarded
 adapter fixes Responses API selection for `gpt-6-luna`, authentication imports,
 URL-only MCP transport inference, transcript delivery, and compact UI behavior.
 Unexpected upstream source patterns fail rather than applying uncertain patches.
+The voice server's automatic raw session journals are redirected from
+`memory/journal/` to ignored `.gitagent/journal/` by a guarded, idempotent patch.
+They stay out of the curated OKF memory bundle and host commits. The runtime's
+separate Git index explicitly stages its journal files; the host index is not used.
 
 The OKF utility is mounted as `/usr/local/bin/okf`; in containers use `okf index`
 or `okf validate`, not an agent-relative `bin/okf`. It defaults to `/agent/knowledge`,
@@ -141,3 +146,34 @@ Treat scenario modules as executable trusted code, like the test scripts.
 | Old helper path or unchanged config | Follow relocation migration; refresh does not change mounts. |
 | Missing `yaml` | Install `PyYAML==6.0.3` into the host test environment. |
 | Guarded adapter failure | Review pinned runtime source before changing adapters or versions. |
+
+## Evaluation and permission adapter
+
+`bin/run-eval.py --agent-dir "$AGENT_DIR" -- "prompt"` runs actual
+`opencode run --format json --model provider/model --agent gitagent-main` in
+the existing container's `/workspace`. It requires host Python/PyYAML and Docker.
+The timeout defaults to 180 seconds (maximum 600); no shell string is evaluated.
+JSON output contains `output` and `metadata.tools`, preserving completed and
+failed tool events for evidence-based assertions. Runtime errors and missing
+assistant output fail, rather than returning a canned response. It supports
+`target=main` only; test a subagent through actual main-agent delegation.
+
+Refresh the selected runtime before evaluations. Copying an agent to another
+host path selects another container. If mounts predate `permissions.mjs`,
+recreate with approval as described above. The model comes from `agent.yaml`.
+
+The local permissions extension maps `cli` to `shell`, `write` and `memory` to
+`edit`, and retains other literal V2 action names. Conflicting alias effects
+fail export. Rules start with the declared default, then allow/ask/deny
+exceptions; secret-file reads are denied. Subagent allow is restricted to the
+declared child IDs, and each child's own permissions are exported independently.
+For pinned OpenCode 2.0.28, MCP permission actions use `server_tool`, retaining
+tool hyphens. Enable `execute` for Code Mode and discover its catalog with
+`search` before calling MCP tools. Catalog metadata records `server.tool`
+names, which are not the permission action names.
+For agents without this extension, upstream defaults remain unchanged.
+
+Neither these rules nor a declarative hook binding proves GitAgent browser
+enforcement. The browser runtime is a trusted localhost demo, not a policy
+sandbox. Hooks require a host that implements OpenGAP's JSON hook protocol.
+OpenCode uses native permissions rather than executing that hook script.

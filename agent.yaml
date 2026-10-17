@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=./schemas/agent.schema.json
 spec_version: "0.1.0"
 name: my-agent
 version: 0.1.0
@@ -6,6 +7,20 @@ model:
   preferred: "openai:gpt-6-luna"
   fallback: []
 tools: [cli, read, write, memory]
+skills: [gitagent, okf-knowledge, echo-start, echo-middle, echo-end, code-review, testing]
+agents:
+  security-reviewer:
+    description: Read-only security review of supplied code and repository files
+    delegation:
+      mode: explicit
+delegation:
+  mode: explicit
+# Local extension; enforced by the OpenCode adapter, not the browser runtime.
+permissions:
+  default: deny
+  allow: [read, glob, grep, skill, subagent, execute, context7_resolve-library-id, context7_query-docs]
+  ask: [cli, write, memory]
+  deny: [websearch]
 mcp_servers:
   context7:
     url: https://mcp.context7.com/mcp

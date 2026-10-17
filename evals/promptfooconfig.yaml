@@ -1,0 +1,17 @@
+# yaml-language-server: $schema=https://promptfoo.dev/config-schema.json
+description: Existing GitAgent knowledge, security, delegation, and policy regressions
+prompts:
+  - "{{input}}"
+providers:
+  - id: file://../scripts/promptfoo_gitagent.py
+    label: my-agent-opencode
+    config:
+      agent_path: ..
+      target: main
+      timeout: 210000
+      runner_timeout_seconds: 180
+tests:
+  - file://cases/*.yaml
+outputPath: evals/results/latest.json
+evaluateOptions:
+  maxConcurrency: 1

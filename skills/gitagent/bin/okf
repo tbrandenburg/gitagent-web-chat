@@ -157,7 +157,9 @@ def cmd_validate(args, root):
                 errors.append(f'{rel}: invalid status')
         except (ValueError, yaml.YAMLError, UnicodeError) as err:
             errors.append(f'{rel}: {err}')
-    for idx in root.rglob('index.md'):
+    for idx in sorted(root.rglob('*.md')):
+        if idx.name not in RESERVED:
+            continue
         if idx.is_symlink():
             continue
         try:

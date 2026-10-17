@@ -35,12 +35,15 @@ search:
 test:
 	python3 -m unittest discover -s "$(GITAGENT_SKILL_DIR)/tests" -v
 	node --test "$(GITAGENT_SKILL_DIR)/tests/mcp-config.test.mjs"
+	node --test "$(GITAGENT_SKILL_DIR)/tests/permissions.test.mjs"
 
 lint:
 	bash -n "$(GITAGENT_SKILL_DIR)/scripts/web-agent.sh"
 	bash -n "$(GITAGENT_SKILL_DIR)/scripts/opencode-web.sh"
 	node --check "$(GITAGENT_SKILL_DIR)/bin/export-opencode.mjs"
 	node --check "$(GITAGENT_SKILL_DIR)/bin/mcp-config.mjs"
+	node --check "$(GITAGENT_SKILL_DIR)/bin/permissions.mjs"
+	python3 -c "import ast,pathlib; ast.parse(pathlib.Path('$(GITAGENT_SKILL_DIR)/bin/run-eval.py').read_text())"
 	node --check "$(GITAGENT_SKILL_DIR)/tests/live-chat.mjs"
 	node --check "$(GITAGENT_SKILL_DIR)/tests/live-opencode-mcp.mjs"
 

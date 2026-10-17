@@ -3,7 +3,10 @@
 !.env.example
 .gitagent/
 workspace/
-memory/
+memory/runtime/
+memory/archive/
+evals/results/
+.promptfoo/
 .playwright-mcp/
 node_modules/
 __pycache__/

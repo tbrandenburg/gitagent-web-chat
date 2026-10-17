@@ -1,0 +1,11 @@
+- description: Identify SQL injection and a concrete safe fix
+  vars:
+    input: |
+      Review this supplied code without running tools or changing files:
+      query = f"SELECT * FROM users WHERE name = '{name}'"
+      name comes from an HTTP request. Name the vulnerability and safe fix.
+  assert:
+    - type: icontains
+      value: SQL injection
+    - type: regex
+      value: '[Pp]aramet(eriz|eris|er bind)|[Pp]repared statement|[Bb]ind parameters'
