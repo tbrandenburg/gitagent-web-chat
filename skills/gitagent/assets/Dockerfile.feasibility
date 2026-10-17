@@ -1,0 +1,36 @@
+FROM node:22-bookworm-slim AS source
+RUN apt-get update -qq \
+    && apt-get install -y -qq --no-install-recommends git ca-certificates python3 python3-yaml \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /opt/agent
+COPY agent.yaml SOUL.md RULES.md DUTIES.md LICENSE ./
+COPY agents/ agents/
+COPY hooks/ hooks/
+COPY knowledge/ knowledge/
+COPY memory/ memory/
+COPY skills/ skills/
+COPY workflows/ workflows/
+RUN chmod -R a=rX /opt/agent \
+    && ln -s /opt/agent/skills/gitagent/bin/okf /usr/local/bin/okf
+ENV HOME=/tmp/home XDG_CONFIG_HOME=/tmp/home/.config \
+    XDG_DATA_HOME=/tmp/home/.local/share XDG_CACHE_HOME=/tmp/home/.cache \
+    OKF_ROOT=/tmp/workspace/knowledge
+WORKDIR /tmp
+ENTRYPOINT ["bash", "/opt/agent/skills/gitagent/scripts/container-start.sh"]
+
+FROM source AS gitagent
+RUN npm install -g @open-gitagent/gitagent@2.2.0 @open-gitagent/voice@1.0.0 \
+    && python3 /opt/agent/skills/gitagent/bin/configure-runtime.py \
+       /usr/local/lib/node_modules/@open-gitagent/gitagent/dist/loader.js \
+       /usr/local/lib/node_modules/@open-gitagent/voice/dist/server.js \
+    && python3 /opt/agent/skills/gitagent/bin/configure-container.py \
+       /usr/local/lib/node_modules/@open-gitagent/voice/dist/server.js \
+    && npm cache clean --force
+USER node
+CMD ["gitagent"]
+
+FROM source AS opencode
+RUN npm install -g @open-gitagent/opengap@0.5.0 @opencode/cli@2.0.28 \
+    && npm cache clean --force
+USER node
+CMD ["opencode"]
