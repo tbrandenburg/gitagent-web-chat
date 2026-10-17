@@ -43,7 +43,7 @@ git config --global user.email gitagent@localhost
 git init --initial-branch=main >/dev/null
 if [[ "$RUNTIME" == opencode ]]; then
   node /opt/agent/skills/gitagent/bin/export-opencode.mjs /tmp/workspace
-  exec opencode serve --hostname 0.0.0.0 --port "$PORT"
+  exec node /opt/agent/skills/gitagent/bin/opencode-ready.mjs
 fi
 export GITAGENT_CLOUD=true
 exec gitagent --voice gemini --dir /tmp/workspace

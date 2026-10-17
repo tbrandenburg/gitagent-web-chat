@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Opt-in Docker checks for built local images. No model credentials or inference."""
 import argparse
+import base64
 import http.client
+import json
 import os
 from pathlib import Path
 import secrets
@@ -25,11 +27,29 @@ def docker(*args: str, source: str | None = None, env: dict | None = None,
     return result.stdout.strip()
 
 
-def ready(name: str, port: str) -> float:
+def ready(name: str, port: str, runtime: str, password: str, internal: int) -> float:
     started = time.monotonic()
-    for _ in range(90):
+    deadline = started + 90
+    while time.monotonic() < deadline:
         if docker('inspect', '--format', '{{.State.Running}}', name) != 'true':
             raise RuntimeError('Disposable server exited: ' + docker('logs', name)[-2000:])
+        if runtime == 'opencode':
+            # Docker's host proxy can accept TCP before the container listens.
+            sockets = docker('exec', name, 'cat', '/proc/net/tcp')
+            listening = any(len(fields) > 3 and fields[1] == f'00000000:{internal:04X}'
+                            and fields[3] == '0A' for fields in map(str.split, sockets.splitlines()))
+            if not listening:
+                time.sleep(0.1)
+                continue
+            # First external HTTP request, without retrying a failed response.
+            token = base64.b64encode(f'opencode:{password}'.encode()).decode()
+            request = urllib.request.Request(f'http://127.0.0.1:{port}/api/info',
+                                             headers={'Authorization': f'Basic {token}'})
+            with urllib.request.urlopen(request, timeout=5) as response:
+                if response.status != 200 or json.load(response).get('version') != '2.0.28':
+                    raise RuntimeError('First native API request was not ready')
+            print('OpenCode: first external API request returned 200 without HTTP retries', flush=True)
+            return round(time.monotonic() - started, 2)
         try:
             with urllib.request.urlopen(f'http://127.0.0.1:{port}/', timeout=2) as response:
                 if response.status == 200:
@@ -59,7 +79,7 @@ def check(runtime: str, browser: bool, internal: int) -> None:
                '-e', 'OPENCODE_SERVER_PASSWORD', image, env=env)
         created = True
         port = docker('port', name, f'{internal}/tcp').rsplit(':', 1)[1]
-        startup = ready(name, port)
+        startup = ready(name, port, runtime, env['OPENCODE_SERVER_PASSWORD'], internal)
         print(f'{runtime}: localhost startup {startup}s, read-only root + /tmp only', flush=True)
         transport = (TESTS / 'container-transport.mjs').read_text()
         print(docker('exec', '-i', '-e', f'FEASIBILITY_RUNTIME={runtime}', name,
@@ -68,6 +88,10 @@ def check(runtime: str, browser: bool, internal: int) -> None:
         assert docker('exec', name, 'id', '-u') == '1000'
         sockets = docker('exec', name, 'cat', '/proc/net/tcp')
         assert f'00000000:{internal:04X}' in sockets, 'Expected explicit IPv4 wildcard port'
+        if runtime == 'opencode':
+            backend = 4097 if internal == 4096 else 4096
+            assert f'0100007F:{backend:04X}' in sockets, 'Native backend must listen on loopback only'
+            assert f'00000000:{backend:04X}' not in sockets, 'Native backend must not bypass readiness gate'
         assert docker('exec', name, 'sh', '-c', 'test ! -w /opt/agent/agent.yaml && test -w /tmp/workspace/agent.yaml; echo $?') == '0'
         assert docker('diff', name) == '', 'Writes escaped /tmp tmpfs'
         paths = docker('exec', name, 'find', '/tmp/home', '-maxdepth', '4', '-type', 'd')
@@ -85,7 +109,7 @@ def check(runtime: str, browser: bool, internal: int) -> None:
         docker('exec', name, 'touch', '/tmp/cold-start-marker')
         docker('restart', name)
         port = docker('port', name, f'{internal}/tcp').rsplit(':', 1)[1]
-        restart = ready(name, port)
+        restart = ready(name, port, runtime, env['OPENCODE_SERVER_PASSWORD'], internal)
         assert docker('exec', name, 'sh', '-c', 'test ! -e /tmp/cold-start-marker; echo $?') == '0'
         print(docker('exec', '-i', '-e', f'FEASIBILITY_RUNTIME={runtime}', name,
                      'node', '--input-type=module', source=transport, timeout=60), flush=True)
@@ -101,6 +125,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('runtime', choices=('gitagent', 'opencode'))
     parser.add_argument('--browser', action='store_true', help='Requires host Playwright and Chromium')
-    parser.add_argument('--port', type=int, choices=(80, 8080), default=8080)
+    parser.add_argument('--port', type=int, choices=(80, 8080, 4096), default=8080)
     options = parser.parse_args()
     check(options.runtime, options.browser, options.port)

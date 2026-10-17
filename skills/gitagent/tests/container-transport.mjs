@@ -84,7 +84,13 @@ if (runtime === 'gitagent') {
   const javascript = await request(asset[1]);
   assert.equal(javascript.status, 200);
   assert.ok((await javascript.text()).length > 100);
-  assert.equal((await request('/api/info', { headers })).status, 200);
+  const identity = await request('/api/info', { headers });
+  assert.equal(identity.status, 200);
+  const native = await identity.json();
+  const owned = readFileSync('/proc/1/task/1/children', 'utf8').trim().split(/\s+/);
+  assert.ok(owned.includes(String(native.pid)), 'Native API PID must belong to the adapter child');
+  assert.match(readFileSync(`/proc/${native.pid}/cmdline`, 'utf8'), /opencode/);
+  console.log('OpenCode: native API PID matches the adapter-owned child');
   const schema = await request('/openapi.json', { headers });
   assert.equal(schema.status, 200);
   assert.ok((await schema.json()).paths['/api/event']);
@@ -96,17 +102,11 @@ if (runtime === 'gitagent') {
   for (const action of ['shell', 'edit']) assert.ok(rules.some(rule => rule.action === action && rule.effect === 'ask'));
   assert.ok(rules.some(rule => rule.action === 'read' && rule.resource === '*.env' && rule.effect === 'deny'));
   assert.equal(config.agents['security-reviewer'].permissions[0].effect, 'deny');
-  const deadline = Date.now() + 30000;
-  const registered = async () => {
-    const response = await request('/api/agent?location[directory]=%2Ftmp%2Fworkspace', { headers });
-    assert.equal(response.status, 200);
-    const agents = (await response.json()).data;
-    if (['gitagent-main', 'security-reviewer'].every(id => agents.some(agent => agent.id === id))) return agents;
-    assert.ok(Date.now() < deadline, 'Configured agents did not register before deadline');
-    await new Promise(resolve => setTimeout(resolve, 100));
-    return registered();
-  };
-  const agents = await registered();
+  const registered = await request('/api/agent?location[directory]=%2Ftmp%2Fworkspace', { headers });
+  assert.equal(registered.status, 200);
+  const agents = (await registered.json()).data;
+  assert.ok(['gitagent-main', 'security-reviewer'].every(id => agents.some(agent => agent.id === id)),
+    'Configured agents must be ready before public port opens; no HTTP retry');
   const main = agents.find(agent => agent.id === 'gitagent-main');
   const preserves = (actual, exported) => {
     // Runtime defaults precede manifest rules; later restrictions may only deny.

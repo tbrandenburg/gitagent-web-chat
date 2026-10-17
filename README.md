@@ -300,6 +300,10 @@ make up-opencode
 Sign in with fixed username **`opencode`** and password **`password`** by
 default (some browser dialogs ask only for the password). On the first visit,
 choose **Add project**, select **`/workspace`**, and start a session.
+For pinned CLI/UI 2.0.28, enable **Settings → General → Show agent**, keep automatic
+permission approval off, and select **`gitagent-main`** before submitting. When
+the selector is hidden, this UI explicitly chooses **Build**, whose permissions
+are not the exported main-agent rules; the server default alone is insufficient.
 For another agent and port:
 
 ```sh
@@ -421,6 +425,61 @@ permission bypasses**, not successful enforcement: **NO-GO for public exposure**
 OpenCode is **CONDITIONAL GO for an owner-approved protected cloud experiment**,
 not a production or security-parity claim. No Vercel project or registry upload
 is included; cloud work and inference spending require a separate owner decision.
+
+### Protected Hobby Docker preview (issue #13)
+
+A no-inference OpenCode preview passed cloud UI/assets, API authentication,
+SSE, exported native main/child rules and source-identical OKF navigation checks
+on an active, usage-capped Hobby account. **All Deployments** Vercel
+Authentication was enabled at project creation, before deployment. GitHub is not
+linked and autobuilds remain disabled. Model credentials were withheld during
+the initial probes. Later owner-approved inference verified genuine main-agent
+answers, canonical production retrieval and native permission rejection with
+same-session filesystem absence evidence. This is not completion of issue #13:
+session continuity, cancellation and owner acceptance remain blocked or pending.
+
+Real Chromium password entry, incorrect-password rejection, project selection,
+empty-session UI, reload/new tab and a 45-second idle reconnect were exercised.
+The no-model RCA traced the earlier intermittent API 503s to two post-idle responses with native
+`{"code":"service_starting"}`: pinned OpenCode opens its socket before API boot
+finishes. The deployment image now uses a [TCP readiness gate](/skills/gitagent/bin/opencode-ready.mjs)
+that keeps `$PORT` closed until the native API, workspace integrations and exported
+agent IDs and the owned server PID are ready. The protected cloud regression
+passed **48/48 requests** without retry and **three complete browser cycles**
+without HTTP 5xx or page errors. It relays bytes without changing HTTP/auth/SSE/
+WebSocket messages; actual native PTY/WebSocket output also passed. This is not
+a persistence fix; the original `make up-opencode` launcher is unchanged.
+Native session metadata was also lost after 45 seconds idle, despite successful
+server health checks. Manual export/import was inconsistent across subsequent
+requests. Persistent-chat acceptance remains blocked by Function-local SQLite;
+no database or Sandbox architecture change was introduced.
+SSE cancellation also remains blocked in cloud: baseline and gated streams closed
+by the client still reached Vercel's 300-second timeout. The documented opt-in
+cancellation setting is Node.js-only, not a verified container-runtime fix.
+The limited inference pass used a sensitive Preview-only model key. Five prompt
+submissions produced seven recorded model messages with approximately **$0.0051**
+in runtime-reported response costs, excluding unobserved maintenance calls and
+without independently verified provider billing. See the runtime reference for
+the initial wrong-agent discovery and corrected evidence assessment.
+
+The [preview staging helper](/skills/gitagent/scripts/prepare-opencode-preview.py)
+copies tracked curated inputs outside the repository and generates root Docker
+build artifacts from the existing pinned image source. Runtime/archive memory,
+workspace state and Docker-excluded tooling are removed **before upload**; known
+credential filenames are rejected. Selected inputs and packaged Docker artifacts
+must match a committed Git HEAD, including staged and working-tree bytes; excluded
+state and unrelated host documentation may remain dirty. This is not a content-based
+secret detector: review the selected tracked source for embedded secrets before staging.
+The smoke helper requires explicit `--project` and `--scope`, authenticated Vercel
+CLI read-only API access, and supplied bypass/password environment values. Before
+preparing credential-bearing requests, it verifies the exact canonical host belongs
+to that project, is READY Preview, and has All Deployments protection. It uses
+private curl configuration files and never creates a bypass or changes cloud
+settings. Vercel's nested Dockerfile
+build used the wrong context; local Docker behavior is unchanged. See
+[cloud evidence and reproduction](/skills/gitagent/references/runtime-management.md#protected-hobby-preview-issue-13)
+for protection, free-plan limits, the first-deployment production pitfall and
+remaining acceptance gates. Do not import/link GitHub or expose public production.
 
 ## Development
 
