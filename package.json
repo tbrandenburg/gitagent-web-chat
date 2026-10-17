@@ -2,6 +2,7 @@
   "name": "gitagent-web-chat-evals",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "npm@10.9.4",
   "engines": { "node": ">=22.22.0" },
   "scripts": {
     "eval": "PROMPTFOO_CONFIG_DIR=.promptfoo PROMPTFOO_DISABLE_TELEMETRY=1 promptfoo eval -c evals/promptfooconfig.yaml --no-cache --max-concurrency 1",

@@ -408,6 +408,11 @@ make lint test validate doctor
 npm run eval:validate
 ```
 
+CI uses Node.js 22.22.0 / npm 10.9.4. Generate lockfile updates with npm 10.9.4
+(or `npx --yes npm@10.9.4 install --package-lock-only`); newer npm releases can
+emit a transitive dependency layout that this CI installer rejects. A clean
+Node 22.22.0 container install is the compatibility check for toolchain updates.
+
 [GitHub Actions](.github/workflows/checks.yml) runs the same command on PRs and
 `main`. It checks shell/JavaScript/Python syntax, Python and Node regression
 tests, pinned manifests, both OKF bundles, diagnostics, and native Promptfoo
