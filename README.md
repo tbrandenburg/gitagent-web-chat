@@ -347,8 +347,12 @@ Live evaluations need the model key and consume API tokens. The suite checks
 production answers, SQL injection remediation, actual security delegation and
 native permission rejection using tool evidence—not just assistant claims.
 Results go to ignored `evals/results/` and can contain private source content.
-The [live evaluation workflow](/.github/workflows/agent-evals.yml) is manually
-triggered, not run automatically on PRs.
+The [Evals workflow](/.github/workflows/agent-evals.yml) is manually triggered,
+not run automatically on PRs. To use it in a repository created from this template,
+add your own `OPENAI_API_KEY` repository secret with access to the configured model,
+and adapt `evals/cases/` to your agent's knowledge, subagents and permission policy.
+Uploaded results can contain source content; review artifact access and retention
+before running against private data.
 
 Additional live checks are `make test-live`, `make test-production-live`,
 `make test-gitagent-mcp-live` and `make test-mcp-live`. They check runtime/tool
