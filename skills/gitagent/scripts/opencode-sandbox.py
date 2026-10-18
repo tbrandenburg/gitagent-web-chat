@@ -34,12 +34,16 @@ def operate(args: argparse.Namespace, api: API) -> dict:
     if args.with_model and (not starting or not os.environ.get('OPENAI_API_KEY')):
         raise ValueError('--with-model requires explicit start/resume and inherited model key')
     selected = api.identity(args.project, admit=starting)
-    if args.image.split('/')[:2] != [args.scope, selected['name']]:
-        raise ValueError('Image must belong to the explicit scope and selected project')
+    owner, image_project = args.image.split('/')[:2]
+    if owner != args.scope:
+        raise ValueError('Image must belong to the explicit scope')
+    renamed = image_project != selected['name']
     project = selected['id']
     path = '/v2/sandboxes/' + args.name + '?' + urllib.parse.urlencode({'projectId': project})
     exists = api.exists(project, args.name)
     if not exists:
+        if renamed:
+            raise ValueError('New Sandbox image must use the current project name')
         if args.operation != 'start' or args.with_model:
             raise ValueError('Sandbox absent; first start must bootstrap without model credentials')
         api.call('/v2/sandboxes', 'POST', {
@@ -56,6 +60,9 @@ def operate(args: argparse.Namespace, api: API) -> dict:
         return report(data)
     if args.operation == 'stop':
         return stop(api, path, data, identity)
+    if renamed:
+        # Vercel preserves historical image names on retained Sandboxes after project rename.
+        api.verify_retained_image(selected, args.image)
     if data['session']['status'] in {'failed', 'aborted', 'stopping', 'snapshotting'}:
         raise ValueError('Start/resume refuses terminal or stopping session states')
     if args.with_model and (box['status'] != 'stopped' or box['tags'].get('protection') != 'verified'):

@@ -710,6 +710,18 @@ containers/volume and binds a random localhost port; shared runtimes are not use
 
 ### Operator commands
 
+Use a stable descriptive project name, such as `gitagent-web-chat`, rather than
+a ticket-specific name. A Vercel project rename preserves its project ID, but
+retained Sandboxes keep their original immutable image reference. Update the
+operator's `--project` value and any private selected-resource configuration;
+do not rewrite the retained image string or recreate the Sandbox to change it.
+For an existing managed Sandbox, start/resume resolves the original repository
+and digest through VCR using the verified project/account IDs before forwarding
+credentials. A missing/foreign repository, mismatched digest or non-ready image
+fails closed. New Sandboxes must use the current project name in their image
+reference. Status and stop still verify Sandbox ownership without requiring
+registry availability. Historical deployment URLs remain historical evidence.
+
 Require authenticated Vercel CLI (tested interface: 64.5.0), host Python 3.12 and
 explicit active Hobby **scope slug**, protected existing project, stable name and
 full owner/project/repository digest. Publishing the optional image to VCR is a
