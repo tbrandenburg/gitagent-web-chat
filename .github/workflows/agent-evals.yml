@@ -1,4 +1,4 @@
-name: Live agent evaluations
+name: Evals
 on:
   workflow_dispatch:
 permissions:
