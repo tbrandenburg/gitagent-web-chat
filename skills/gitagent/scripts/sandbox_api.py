@@ -79,6 +79,18 @@ class API:
                 raise ValueError('Invalid Sandbox pagination')
             cursor = following
 
+    def verify_retained_image(self, project: dict, image: str) -> None:
+        repository, digest = image.rsplit('/', 1)[1].split('@')
+        query = urllib.parse.urlencode({'projectId': project['id'], 'teamId': project['accountId']})
+        path = '/v1/vcr/repository/' + urllib.parse.quote(repository, safe='')
+        stored = self.call(path + '?' + query)['repository']
+        if stored.get('projectId') != project['id'] or stored.get('name') != repository:
+            raise ValueError('Retained image repository does not belong to the verified project')
+        detail = self.call(path + '/images/' + urllib.parse.quote(digest, safe='') + '?' + query)['image']
+        if (detail.get('repositoryId') != stored.get('id') or not stored.get('id')
+                or detail.get('manifestDigest') != digest or detail.get('status') != 'ready'):
+            raise ValueError('Retained image digest/ownership/readiness mismatch')
+
     def command(self, session: str, command: str, args: list[str], environment: dict | None = None,
                 wait: bool = True) -> dict:
         if not re.fullmatch(r'[A-Za-z0-9_-]+', session):

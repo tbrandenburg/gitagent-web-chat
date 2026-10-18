@@ -274,7 +274,8 @@ Setup requires your own authenticated Vercel CLI, host Python 3.12, an active
 Hobby scope, a protected project, a built/published immutable VCR image and a
 unique runtime password. First bootstrap is model-free. After protection checks
 and stop, `resume --with-model` forwards the inherited model key to OpenCode;
-it does not submit prompts. Pass explicit scope, project, name and image values.
+it does not submit prompts. Pass explicit scope, project, name and image values;
+use a stable project name such as `gitagent-web-chat`, not an issue number.
 
 - Standard Nginx Basic auth protects the UI, assets, API, SSE and WebSockets.
   **Vercel project Deployment Protection does not cover the Sandbox URL.**
