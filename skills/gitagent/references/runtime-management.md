@@ -205,7 +205,7 @@ OpenCode uses native permissions rather than executing that hook script.
 
 Issue #11's local-only experiment uses
 `assets/Dockerfile.feasibility` with two targets. Run the two `docker build`
-commands in [the README](/README.md#local-container-feasibility-issue-11) from
+commands in [the README](/README.md#prebuilt-docker-images) from
 the **repository root**. The Dockerfile-specific `.dockerignore` allowlists
 agent inputs and excludes environment files, Git metadata, evaluation packages,
 dependencies, tests, caches and runtime memory. No build args or model credentials
